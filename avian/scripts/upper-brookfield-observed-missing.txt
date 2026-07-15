@@ -1,0 +1,23 @@
+Aviceda subcristata|Pacific Baza
+Haliastur sphenurus|Whistling Kite
+Porphyrio melanotus|Australasian Swamphen
+Vanellus miles|Masked Lapwing
+Burhinus grallarius|Bush Stone-curlew
+Columba livia|Rock Dove
+Ocyphaps lophotes|Crested Pigeon
+Spilopelia chinensis|Spotted Dove
+Zanda funerea|Yellow-tailed Black-Cockatoo
+Eolophus roseicapilla|Galah
+Alisterus scapularis|Australian King-Parrot
+Platycercus elegans|Crimson Rosella
+Centropus phasianinus|Pheasant Coucal
+Ninox strenua|Powerful Owl
+Podargus strigoides|Tawny Frogmouth
+Gerygone olivacea|White-throated Gerygone
+Pardalotus striatus|Striated Pardalote
+Sericornis frontalis|White-browed Scrubwren
+Caligavis chrysops|Yellow-faced Honeyeater
+Melithreptus albogularis|White-throated Honeyeater
+Lichmera indistincta|Brown Honeyeater
+Acanthorhynchus tenuirostris|Eastern Spinebill
+Myzomela sanguinolenta|Scarlet Honeyeater
