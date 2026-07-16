@@ -78,3 +78,5 @@ rembg/
 avian/assets/illustrations-backups/
 # Retain cream-background generation inputs locally; only approved cutouts deploy.
 avian/assets/illustration-libraries/*/generated/
+# The upstream US artwork is retained locally for reference, never deployed.
+avian/assets/illustration-libraries/original-us/

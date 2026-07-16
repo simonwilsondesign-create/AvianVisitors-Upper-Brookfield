@@ -47,7 +47,7 @@ Installer assumes passwordless sudo (Raspberry Pi OS Lite default - if you've ti
 
 ```bash
 ssh <your-username>@birdnet.local
-curl -s https://raw.githubusercontent.com/Twarner491/AvianVisitors/avian-visitors/newinstaller.sh | bash
+curl -s https://raw.githubusercontent.com/simonwilsondesign-create/AvianVisitors-Upper-Brookfield/upper-brookfield/newinstaller.sh | bash
 ```
 
 Clones this fork, installs BirdNET-Pi, symlinks the AvianVisitors overlay into the Caddy web root. Takes 20-40 minutes. Reboots when done.
