@@ -26,6 +26,17 @@
 
 *.pyc
 __pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.secret
 *.flac
 .vscode
 model/labels.txt
@@ -49,6 +60,10 @@ include_species_list.txt
 whitelist_species_list.txt
 /nbproject/private/
 .DS_Store
+._*
+*.swp
+*.swo
+*~
 
 # --- AvianVisitors: local-only material, deliberately not shipped ---
 # Claude Code session data
@@ -57,3 +72,9 @@ whitelist_species_list.txt
 avian/assets/references/
 # Superseded assets retained locally
 avian/assets/_legacy/
+# rembg downloads its ONNX models here unless REMBG_HOME is overridden.
+.u2net/
+rembg/
+avian/assets/illustrations-backups/
+# Retain cream-background generation inputs locally; only approved cutouts deploy.
+avian/assets/illustration-libraries/*/generated/

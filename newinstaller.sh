@@ -43,8 +43,11 @@ if [[ ! -z $PACKAGES_MISSING ]] ; then
   sudo apt -y install $PACKAGES_MISSING
 fi
 
-branch=avian-visitors
-git clone -b $branch --depth=1 https://github.com/Twarner491/AvianVisitors.git ${HOME}/BirdNET-Pi &&
+# This fork is the default installation source.  Override either value only
+# when deliberately installing another maintained fork or branch.
+repository_url="${AVIANVISITORS_REPOSITORY_URL:-https://github.com/simonwilsondesign-create/AvianVisitors-Upper-Brookfield.git}"
+branch="${AVIANVISITORS_BRANCH:-upper-brookfield}"
+git clone -b "$branch" --depth=1 "$repository_url" "${HOME}/BirdNET-Pi" &&
 
 $HOME/BirdNET-Pi/scripts/install_birdnet.sh
 if [ ${PIPESTATUS[0]} -eq 0 ];then
