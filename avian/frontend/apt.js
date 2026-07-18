@@ -2,7 +2,7 @@
   var PLACEHOLDER = [{ "sci": "Calypte anna", "com": "Anna's Hummingbird", "featured": true }, { "sci": "Passer domesticus", "com": "House Sparrow" }, { "sci": "Haemorhous mexicanus", "com": "House Finch" }, { "sci": "Turdus migratorius", "com": "American Robin" }, { "sci": "Zenaida macroura", "com": "Mourning Dove" }, { "sci": "Spinus psaltria", "com": "Lesser Goldfinch" }, { "sci": "Zonotrichia leucophrys", "com": "White-crowned Sparrow" }, { "sci": "Aphelocoma californica", "com": "California Scrub-Jay" }, { "sci": "Mimus polyglottos", "com": "Northern Mockingbird" }, { "sci": "Sayornis nigricans", "com": "Black Phoebe" }, { "sci": "Larus occidentalis", "com": "Western Gull" }, { "sci": "Corvus brachyrhynchos", "com": "American Crow" }];
   // Bumped whenever the offline sketch build changes, so the browser
   // doesn't keep a stale cache after we regenerate the sketches.
-  var SKETCH_VERSION = 'r13'; // r13: Upper Brookfield Brisbane library (43 species, paired poses).
+  var SKETCH_VERSION = 'r14'; // r14: scheduled standard, Friday-fun and weekend-storybook libraries.
   // re-rendered (perched + flight) with clean cutouts.
   // Cache-bust for /api/img - bump whenever a bird gets re-rendered via
   // /api/regen or whenever you need every CF DC to drop its cached copy.
@@ -10,8 +10,53 @@
   // equivalent to a global cache purge for /api/img. (caches.default
   // .delete() in the worker only affects ONE colo at a time, so a
   // versioned URL is the only reliable way to invalidate everywhere.)
-  var IMG_VERSION = 'r13'; // r13: Upper Brookfield Brisbane library; bust stale image caches.
+  var IMG_VERSION = 'r14'; // r14: include the selected scheduled library in every image cache key.
   // with clean cutouts, so drop every cached copy.
+
+  var libraryParams = new URLSearchParams(window.location.search);
+  var libraryOverride = (libraryParams.get('bird-library') || '').toLowerCase();
+  var validLibraries = { standard: true, fun: true, wes: true };
+  var browserDay = new Date().getDay(); // 0=Sunday, 1=Monday ... 6=Saturday
+  var ILLUSTRATION_LIBRARY = validLibraries[libraryOverride]
+    ? libraryOverride
+    : (browserDay >= 1 && browserDay <= 4 ? 'standard' : (browserDay === 5 ? 'fun' : 'wes'));
+
+  function libraryApiUrl(asset) {
+    var q = '?library=' + encodeURIComponent(ILLUSTRATION_LIBRARY);
+    if (asset) q += '&asset=' + encodeURIComponent(asset);
+    return './avian/api/illustration-library.php' + q + '&v=' + SKETCH_VERSION;
+  }
+
+  function libraryStatusUrl() {
+    var q = validLibraries[libraryOverride]
+      ? '?library=' + encodeURIComponent(libraryOverride) + '&v=' + SKETCH_VERSION
+      : '?v=' + SKETCH_VERSION;
+    return './avian/api/illustration-library.php' + q;
+  }
+
+  function birdImageSrc(sci, com, pose) {
+    var url = './avian/api/cutout.php?sci=' + encodeURIComponent(sci) +
+      (com ? '&com=' + encodeURIComponent(com) : '') +
+      '&library=' + encodeURIComponent(ILLUSTRATION_LIBRARY) +
+      '&v=' + IMG_VERSION + '-' + encodeURIComponent(ILLUSTRATION_LIBRARY);
+    var n = +pose || 1;
+    return n > 1 ? url + '&pose=' + n : url;
+  }
+
+  function syncPoseLanguage() {
+    var toggle = document.getElementById('modalPoseToggle');
+    if (!toggle) return;
+    var primary = toggle.querySelector('button[data-pose="1"]');
+    var alternate = toggle.querySelector('button[data-pose="2"]');
+    var primaryLabel = ILLUSTRATION_LIBRARY === 'wes' ? 'hero portrait' : 'perched';
+    var alternateLabel = ILLUSTRATION_LIBRARY === 'wes' ? 'side profile' : 'in flight';
+    [[primary, primaryLabel], [alternate, alternateLabel]].forEach(function (item) {
+      if (!item[0]) return;
+      item[0].setAttribute('aria-label', item[1]);
+      var tip = item[0].querySelector('.tip');
+      if (tip) tip.textContent = item[1];
+    });
+  }
 
   // ---- Sliding pill helper ----
   // Each segmented control has a single .seg-pill element that we move via
@@ -210,18 +255,34 @@
 
   var collage = document.getElementById('collage');
   // DIMS[slug]=[w,h] (aspect) and MASKS[slug]={w,h,bits} (1-bit silhouette)
-  // are built offline by scripts/build_masks.py and fetched from dims.json /
-  // masks.json at load. They live in their own files (one key per line) so a
+  // are built offline by scripts/build_masks.py and fetched through the
+  // scheduled-library API at load. They live one key per line so a
   // species-add is a clean diff and two contributors' additions don't collide,
   // instead of rewriting one ~800KB line and conflicting on every merge.
   var DIMS = {}, MASKS = {}, tablesReady = false;
   (function loadTables() {
-    var q = '?v=' + SKETCH_VERSION;
-    Promise.all([
-      fetch('./dims.json' + q).then(function (r) { return r.json(); }),
-      fetch('./masks.json' + q).then(function (r) { return r.json(); })
-    ]).then(function (t) {
-      DIMS = t[0]; MASKS = t[1]; tablesReady = true;
+    fetch(libraryStatusUrl(), { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error('library schedule returned ' + r.status);
+      return r.json();
+    }).then(function (info) {
+      ILLUSTRATION_LIBRARY = info.library || 'standard';
+      syncPoseLanguage();
+      if (!info.override && info.next_reload_ms) {
+        var delay = Math.max(1000, info.next_reload_ms - Date.now());
+        setTimeout(function () { window.location.reload(); }, delay);
+      }
+      return Promise.all([
+        fetch(libraryApiUrl('dims'), { cache: 'no-store' }).then(function (r) {
+          if (!r.ok) throw new Error('library dimensions returned ' + r.status);
+          return r.json();
+        }),
+        fetch(libraryApiUrl('masks'), { cache: 'no-store' }).then(function (r) {
+          if (!r.ok) throw new Error('library masks returned ' + r.status);
+          return r.json();
+        })
+      ]);
+    }).then(function (tables) {
+      DIMS = tables[0]; MASKS = tables[1]; tablesReady = true;
       // renderCollage defers its first pack until the silhouettes exist (see
       // the tablesReady gate); render now that they are here.
       try { renderCollageFromData(); } catch (e) { }
@@ -457,7 +518,7 @@
       }
       return;
     }
-    // Silhouettes (DIMS/MASKS) load async from dims.json/masks.json; until
+    // Silhouettes (DIMS/MASKS) load async for the scheduled library; until
     // they arrive we cannot pack. Defer and retry, like the !W/!H case below.
     // (The empty-nest path above needs no silhouettes and already returned.)
     if (!tablesReady) { setTimeout(function () { renderCollage(items, animate); }, 80); return; }
@@ -584,10 +645,7 @@
       // com flows through so the worker's JIT Gemini job uses the right
       // common name in its prompt for a freshly-detected species.
       // &v=IMG_VERSION busts CF edge cache when we re-render any species.
-      var img = './avian/api/cutout.php?sci=' + encodeURIComponent(s.sci) +
-        (s.com ? '&com=' + encodeURIComponent(s.com) : '') +
-        (r.pose === 2 ? '&pose=2' : '') +
-        '&v=' + IMG_VERSION;
+      var img = birdImageSrc(s.sci, s.com || '', r.pose);
       var btn = document.createElement('button');
       btn.className = 'gtile';
       btn.type = 'button';
@@ -1200,9 +1258,7 @@
       var win = winBySci[s.sci] || 0;
       var firstMs = Date.parse((s.first_seen || '').replace(' ', 'T'));
       var isLifer = !isAllWindow && !isNaN(firstMs) && firstMs >= windowStartMs;
-      var sketchSrc = './avian/api/cutout.php?sci=' + encodeURIComponent(s.sci) +
-        (s.com ? '&com=' + encodeURIComponent(s.com) : '') +
-        '&v=' + SKETCH_VERSION;
+      var sketchSrc = birdImageSrc(s.sci, s.com || '', 1);
       var audioSrc = './avian/api/recording.php?sci=' + encodeURIComponent(s.sci);
       // The "all time" window makes the windowed count identical to the
       // all-time count - collapse to a single stat rather than print the
@@ -2012,11 +2068,7 @@
     var sp = ((DATA.lifelist && DATA.lifelist.species) || [])
       .find(function (s) { return s.sci === sci; });
     var com = sp ? (sp.com || '') : '';
-    var base = './avian/api/cutout.php?sci=' + encodeURIComponent(sci) +
-      (com ? '&com=' + encodeURIComponent(com) : '') +
-      '&v=' + SKETCH_VERSION;
-    var n = +pose || 1;
-    return n > 1 ? base + '&pose=' + n : base;
+    return birdImageSrc(sci, com, pose);
   }
   function openDetailModal(sci) {
     if (!sci) return;

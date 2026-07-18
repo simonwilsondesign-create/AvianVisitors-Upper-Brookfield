@@ -13,12 +13,51 @@ transparent PNGs. It is the source for runtime artwork.
 `avian/assets/illustration-libraries/brisbane/generated/` contains the
 cream-background generation inputs and stays local/ignored. Do not deploy it.
 
+The scheduled alternate libraries are:
+
+- `brisbane-weekend/cutouts/` — Friday character birds;
+- `brisbane-wes-anderson/cutouts/` — Saturday and Sunday storybook portraits.
+
+Each alternate library has matching `metadata/dims.json` and
+`metadata/masks.json`. The application selects a complete image-and-metadata
+pair using Brisbane time:
+
+- Monday–Thursday: standard Brisbane birds;
+- Friday: fun character birds;
+- Saturday–Sunday: Wes Anderson-inspired storybook birds.
+
+The image API falls back to the standard library if a scheduled library or its
+metadata is incomplete. The browser reloads just after midnight and uses a
+library-specific cache key, so artwork from the previous day cannot remain
+cached. Test any library without changing the clock by appending one of these
+queries to the AvianVisitors URL:
+
+```text
+?bird-library=standard
+?bird-library=fun
+?bird-library=wes
+```
+
 `avian/assets/illustration-libraries/original-us/` is retained for reference,
 but must not be copied to `avian/assets/illustrations/`. The latter is the only
 runtime artwork path. `avian/frontend/dims.json` and `masks.json` are generated
 from that active directory and must be committed with it.
 
 The Upper Brookfield source lists are in `avian/scripts/upper-brookfield-*.txt`.
+
+After adding or replacing alternate artwork, rebuild that library's metadata:
+
+```bash
+mkdir -p avian/assets/illustration-libraries/brisbane-weekend/metadata
+python3 avian/scripts/build_masks.py \
+  --illustrations avian/assets/illustration-libraries/brisbane-weekend/cutouts \
+  --frontend avian/assets/illustration-libraries/brisbane-weekend/metadata
+
+mkdir -p avian/assets/illustration-libraries/brisbane-wes-anderson/metadata
+python3 avian/scripts/build_masks.py \
+  --illustrations avian/assets/illustration-libraries/brisbane-wes-anderson/cutouts \
+  --frontend avian/assets/illustration-libraries/brisbane-wes-anderson/metadata
+```
 
 ## Deploy and validate locally
 
@@ -45,6 +84,13 @@ the `upper-brookfield` branch from this repository by default:
 
 ```bash
 curl -s https://raw.githubusercontent.com/simonwilsondesign-create/AvianVisitors-Upper-Brookfield/upper-brookfield/newinstaller.sh | bash
+```
+
+Set and confirm the Pi timezone before testing the artwork schedule:
+
+```bash
+sudo timedatectl set-timezone Australia/Brisbane
+timedatectl
 ```
 
 After cloning/updating an existing Pi checkout, run the deploy command above

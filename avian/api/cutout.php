@@ -14,6 +14,7 @@
 // /avian/api/* with basic_auth in your Caddyfile - see avian/forwarding/.
 
 declare(strict_types=1);
+require_once __DIR__ . '/library-schedule.php';
 
 $sci = trim((string)($_GET['sci'] ?? ''));
 if ($sci === '') {
@@ -47,18 +48,34 @@ function serve_png(string $path): void {
     exit;
 }
 
-// 1. Bundled illustration with pose suffix (the kachō-e PNG the repo
-//    ships with). 450+ species cover both perched + flight.
-$bundled = dirname(__DIR__) . "/assets/illustrations/{$slug}{$poseSuffix}.png";
+// 1. Calendar-selected illustration library. Monday-Thursday uses the
+//    standard Brisbane birds, Friday the fun character birds, and weekends
+//    the storybook portraits. ?library=standard|fun|wes is a safe test override.
+$library = av_resolve_library();
+$bundled = $library['definition']['illustrations'] . "/{$slug}{$poseSuffix}.png";
 if (is_file($bundled) && filesize($bundled) > 1024) {
     serve_png($bundled);
 }
 // Pose-2 missing? Fall back to pose-1 so the flight tab still shows
 // the perched render instead of breaking to the photo fallback.
 if ($pose !== 1) {
-    $fallback = dirname(__DIR__) . "/assets/illustrations/$slug.png";
+    $fallback = $library['definition']['illustrations'] . "/$slug.png";
     if (is_file($fallback) && filesize($fallback) > 1024) {
         serve_png($fallback);
+    }
+}
+// A scheduled library may be incomplete while artwork is being prepared.
+// Fall back to the approved standard library for the requested pose/species.
+if ($library['key'] !== 'standard') {
+    $standard = $library['standard']['illustrations'] . "/{$slug}{$poseSuffix}.png";
+    if (is_file($standard) && filesize($standard) > 1024) {
+        serve_png($standard);
+    }
+    if ($pose !== 1) {
+        $standardPrimary = $library['standard']['illustrations'] . "/$slug.png";
+        if (is_file($standardPrimary) && filesize($standardPrimary) > 1024) {
+            serve_png($standardPrimary);
+        }
     }
 }
 // 2. Bundled cutout (background-removed photo, fallback for species
