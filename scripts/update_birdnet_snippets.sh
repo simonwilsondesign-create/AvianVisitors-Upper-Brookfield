@@ -269,6 +269,13 @@ sqlite3 $HOME/BirdNET-Pi/scripts/birds.db << EOF
 CREATE INDEX IF NOT EXISTS "detections_Sci_Name" ON "detections" ("Sci_Name");
 EOF
 
+# Merge, rather than replace, the site-specific whitelist so locally added
+# species survive updates. The normal updater restart below reloads it.
+if [ -f "$HOME/BirdNET-Pi/avian/scripts/configure_birdnet_whitelist.py" ]; then
+  sudo_with_user python3 "$HOME/BirdNET-Pi/avian/scripts/configure_birdnet_whitelist.py" \
+    --target "$HOME/BirdNET-Pi/whitelist_species_list.txt"
+fi
+
 # update snippets above
 
 systemctl daemon-reload

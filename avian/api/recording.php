@@ -12,6 +12,7 @@
 //
 
 declare(strict_types=1);
+require_once __DIR__ . '/taxonomy.php';
 
 $sci = trim((string)($_GET['sci'] ?? ''));
 $file = trim((string)($_GET['file'] ?? ''));
@@ -156,7 +157,7 @@ function resolve_common(string $sci): ?string {
     return null;
 }
 
-$common = resolve_common($sci);
+$common = resolve_common(avian_model_sci($sci));
 if ($common === null) {
     // Last-ditch: try the scientific name itself, with spaces -> underscores.
     // (Some BirdNET dirs are keyed by sci name.)

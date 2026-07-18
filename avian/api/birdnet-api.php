@@ -15,6 +15,7 @@
 // /avian/api/* path - see avian/forwarding/.
 
 declare(strict_types=1);
+require_once __DIR__ . '/taxonomy.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: public, max-age=30');
 
@@ -56,17 +57,18 @@ function one(SQLite3 $db, string $sql, array $bind = []) {
 }
 
 $action = $_GET['action'] ?? 'stats';
+$canonicalSci = avian_canonical_sci_sql();
 
 switch ($action) {
 
     case 'stats': {
         $total       = (int)(one($db, 'SELECT COUNT(*) AS n FROM detections')['n'] ?? 0);
-        $species     = (int)(one($db, 'SELECT COUNT(DISTINCT Sci_Name) AS n FROM detections')['n'] ?? 0);
+        $species     = (int)(one($db, "SELECT COUNT(DISTINCT $canonicalSci) AS n FROM detections")['n'] ?? 0);
         $today       = (int)(one($db, "SELECT COUNT(*) AS n FROM detections WHERE Date = DATE('now','localtime')")['n'] ?? 0);
-        $todaySpec   = (int)(one($db, "SELECT COUNT(DISTINCT Sci_Name) AS n FROM detections WHERE Date = DATE('now','localtime')")['n'] ?? 0);
+        $todaySpec   = (int)(one($db, "SELECT COUNT(DISTINCT $canonicalSci) AS n FROM detections WHERE Date = DATE('now','localtime')")['n'] ?? 0);
         $lastHour    = (int)(one($db, "SELECT COUNT(*) AS n FROM detections WHERE Date = DATE('now','localtime') AND Time >= TIME('now','localtime','-1 hour')")['n'] ?? 0);
         $week        = (int)(one($db, "SELECT COUNT(*) AS n FROM detections WHERE Date >= DATE('now','localtime','-7 day')")['n'] ?? 0);
-        $weekSpec    = (int)(one($db, "SELECT COUNT(DISTINCT Sci_Name) AS n FROM detections WHERE Date >= DATE('now','localtime','-7 day')")['n'] ?? 0);
+        $weekSpec    = (int)(one($db, "SELECT COUNT(DISTINCT $canonicalSci) AS n FROM detections WHERE Date >= DATE('now','localtime','-7 day')")['n'] ?? 0);
         $first       = one($db, 'SELECT MIN(Date) AS d FROM detections');
         echo json_encode([
             'totals'    => ['detections' => $total, 'species' => $species],
@@ -83,9 +85,9 @@ switch ($action) {
         // n = total calls (matches the `recent` action's alias so the
         // frontend can read either response interchangeably).
         $rs = rows($db,
-          "SELECT Sci_Name AS sci, Com_Name AS com, MIN(Date||' '||Time) AS first_seen, "
+          "SELECT $canonicalSci AS sci, MAX(Com_Name) AS com, MIN(Date||' '||Time) AS first_seen, "
         . "       MAX(Date||' '||Time) AS last_seen, COUNT(*) AS n, MAX(Confidence) AS best_conf "
-        . "FROM detections GROUP BY Sci_Name ORDER BY first_seen ASC"
+        . "FROM detections GROUP BY $canonicalSci ORDER BY first_seen ASC"
         );
         echo json_encode(['species' => $rs, 'as_of' => date('c')]);
         break;
@@ -99,11 +101,11 @@ switch ($action) {
         // species-collapsed view: one row per species seen in the window,
         // with the file of its highest-confidence detection inside the window.
         $rs = rows($db,
-          "SELECT Sci_Name AS sci, Com_Name AS com, COUNT(*) AS n, MAX(Confidence) AS best_conf, "
+          "SELECT $canonicalSci AS sci, MAX(Com_Name) AS com, COUNT(*) AS n, MAX(Confidence) AS best_conf, "
         . "       MAX(Date||' '||Time) AS last_seen "
         . "FROM detections "
         . "WHERE (julianday('now','localtime') - julianday(Date||' '||Time)) * 24 <= :hrs "
-        . "GROUP BY Sci_Name ORDER BY last_seen DESC",
+        . "GROUP BY $canonicalSci ORDER BY last_seen DESC",
           [':hrs' => $hours]
         );
         // for each row, attach the file of the top-confidence detection in the window
@@ -111,7 +113,7 @@ switch ($action) {
             $best = one($db,
               "SELECT File_Name AS file, Date AS d, Time AS t, Confidence AS conf "
             . "FROM detections "
-            . "WHERE Sci_Name = :sn "
+            . "WHERE $canonicalSci = :sn "
             . "AND (julianday('now','localtime') - julianday(Date||' '||Time)) * 24 <= :hrs "
             . "ORDER BY Confidence DESC LIMIT 1",
               [':sn' => $r['sci'], ':hrs' => $hours]
@@ -124,17 +126,17 @@ switch ($action) {
     }
 
     case 'species': {
-        $sci = $_GET['sci'] ?? '';
+        $sci = avian_canonical_sci((string)($_GET['sci'] ?? ''));
         if ($sci === '') { http_response_code(400); echo json_encode(['error' => 'sci= required']); break; }
         $detections = rows($db,
           "SELECT Date AS d, Time AS t, File_Name AS file, Confidence AS conf "
-        . "FROM detections WHERE Sci_Name = :sn ORDER BY Date DESC, Time DESC LIMIT 500",
+        . "FROM detections WHERE $canonicalSci = :sn ORDER BY Date DESC, Time DESC LIMIT 500",
           [':sn' => $sci]
         );
         $summary = one($db,
           "SELECT Com_Name AS com, COUNT(*) AS total, MIN(Date||' '||Time) AS first_seen, "
         . "       MAX(Date||' '||Time) AS last_seen, MAX(Confidence) AS best_conf "
-        . "FROM detections WHERE Sci_Name = :sn",
+        . "FROM detections WHERE $canonicalSci = :sn",
           [':sn' => $sci]
         );
         echo json_encode(['sci' => $sci, 'summary' => $summary, 'detections' => $detections]);
@@ -149,7 +151,7 @@ switch ($action) {
         // are otherwise dropped by the GROUP BY.
         $days = max(1, min(90, (int)($_GET['days'] ?? 30)));
         $daily = rows($db,
-          "SELECT Date AS date, COUNT(*) AS detections, COUNT(DISTINCT Sci_Name) AS species "
+          "SELECT Date AS date, COUNT(*) AS detections, COUNT(DISTINCT $canonicalSci) AS species "
         . "FROM detections "
         . "WHERE Date >= DATE('now','localtime','-".($days - 1)." day') "
         . "GROUP BY Date ORDER BY Date"
@@ -175,9 +177,9 @@ switch ($action) {
         // section on the stats view.
         $limit = max(1, min(50, (int)($_GET['limit'] ?? 10)));
         $rs = rows($db,
-          "SELECT Sci_Name AS sci, Com_Name AS com, MIN(Date||' '||Time) AS first_seen, "
+          "SELECT $canonicalSci AS sci, MAX(Com_Name) AS com, MIN(Date||' '||Time) AS first_seen, "
         . "       COUNT(*) AS total "
-        . "FROM detections GROUP BY Sci_Name ORDER BY first_seen DESC LIMIT :lim",
+        . "FROM detections GROUP BY $canonicalSci ORDER BY first_seen DESC LIMIT :lim",
           [':lim' => $limit]
         );
         echo json_encode(['species' => $rs, 'as_of' => date('c')]);

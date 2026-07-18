@@ -13,6 +13,7 @@
 //                                "the most recent" - they can differ).
 
 declare(strict_types=1);
+require_once __DIR__ . '/taxonomy.php';
 
 $sci = trim((string)($_GET['sci'] ?? ''));
 $file = trim((string)($_GET['file'] ?? ''));
@@ -151,7 +152,8 @@ function resolve_common(string $sci): ?string {
     return null;
 }
 
-$common = resolve_common($sci) ?? str_replace(' ', '_', $sci);
+$modelSci = avian_model_sci($sci);
+$common = resolve_common($modelSci) ?? str_replace(' ', '_', $modelSci);
 
 function newest_spectrogram(string $rootDir, string $common): ?string {
     if (!is_dir($rootDir)) return null;

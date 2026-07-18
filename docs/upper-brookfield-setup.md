@@ -45,6 +45,19 @@ from that active directory and must be committed with it.
 
 The Upper Brookfield source lists are in `avian/scripts/upper-brookfield-*.txt`.
 
+`upper-brookfield-birdnet-whitelist.txt` contains the 42 species supported by
+the installed BirdNET 2.4 model. Installation and update merge these entries
+into BirdNET's whitelist so the seasonal occurrence filter cannot suppress
+them, while preserving locally added entries. Regent Bowerbird is retained in
+the illustration library but omitted from the whitelist because this model has
+no `Sericulus chrysocephalus` class.
+
+The model uses the older names `Streptopelia chinensis` and
+`Calyptorhynchus funereus`. The AvianVisitors API canonicalises those to
+`Spilopelia chinensis` and `Zanda funerea`, respectively, so detections use the
+current illustration filenames while recording and spectrogram lookup still
+uses the model taxonomy.
+
 After adding or replacing alternate artwork, rebuild that library's metadata:
 
 ```bash

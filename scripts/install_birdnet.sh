@@ -59,4 +59,9 @@ CURRENT_TIMEZONE=$(timedatectl show --value --property=Timezone)
 
 ./install_language_label.sh || exit 1
 
+# Ensure all BirdNET-supported Upper Brookfield birds bypass the seasonal
+# occurrence filter. The merge preserves any whitelist entries added locally.
+python3 "$my_dir/avian/scripts/configure_birdnet_whitelist.py" \
+  --target "$my_dir/whitelist_species_list.txt" || exit 1
+
 exit 0
