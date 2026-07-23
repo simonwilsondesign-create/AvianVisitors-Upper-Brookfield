@@ -27,6 +27,19 @@ sudo -u ${USER} ln -fs $(dirname $my_dir)/confirmed_species_list.txt $my_dir
 sudo -u ${USER} ln -fs $(dirname $my_dir)/include_species_list.txt $my_dir
 sudo -u ${USER} ln -fs $(dirname $my_dir)/whitelist_species_list.txt $my_dir
 sudo -u ${USER} ln -fs $(dirname $my_dir)/homepage/* ${EXTRACTED}
+# Restore the AvianVisitors overlay after removing and recreating RECS_DIR.
+# Without these links, a data reset silently replaces the custom collage with
+# BirdNET-Pi's stock index page even though the repository remains installed.
+if [ -d $(dirname $my_dir)/avian ]; then
+  sudo -u ${USER} ln -fs $(dirname $my_dir)/avian ${EXTRACTED}/avian
+  sudo -u ${USER} ln -fs $(dirname $my_dir)/avian/frontend/index.html ${EXTRACTED}/index.html
+  sudo -u ${USER} ln -fs $(dirname $my_dir)/avian/frontend/styles.css ${EXTRACTED}/styles.css
+  sudo -u ${USER} ln -fs $(dirname $my_dir)/avian/frontend/apt.js ${EXTRACTED}/apt.js
+  sudo -u ${USER} ln -fs $(dirname $my_dir)/avian/frontend/masks.json ${EXTRACTED}/masks.json
+  sudo -u ${USER} ln -fs $(dirname $my_dir)/avian/frontend/dims.json ${EXTRACTED}/dims.json
+  sudo -u ${USER} ln -fs $(dirname $my_dir)/avian/frontend/nest.webp ${EXTRACTED}/nest.webp
+  sudo -u ${USER} ln -fs $(dirname $my_dir)/avian/assets/favicon.png ${EXTRACTED}/favicon.png
+fi
 sudo -u ${USER} ln -fs $(dirname $my_dir)/model/labels.txt ${my_dir}
 sudo -u ${USER} ln -fs $my_dir ${EXTRACTED}
 sudo -u ${USER} ln -fs $my_dir/play.php ${EXTRACTED}
@@ -36,7 +49,11 @@ sudo -u ${USER} ln -fs $my_dir/stats.php ${EXTRACTED}
 sudo -u ${USER} ln -fs $my_dir/todays_detections.php ${EXTRACTED}
 sudo -u ${USER} ln -fs $my_dir/history.php ${EXTRACTED}
 sudo -u ${USER} ln -fs $my_dir/weekly_report.php ${EXTRACTED}
-sudo -u ${USER} ln -fs $my_dir/homepage/images/favicon.ico ${EXTRACTED}
+if [ -d $(dirname $my_dir)/avian ]; then
+  sudo -u ${USER} ln -fs $(dirname $my_dir)/avian/assets/favicon.png ${EXTRACTED}/favicon.ico
+else
+  sudo -u ${USER} ln -fs $my_dir/homepage/images/favicon.ico ${EXTRACTED}
+fi
 sudo -u ${USER} ln -fs ${HOME}/phpsysinfo ${EXTRACTED}
 sudo -u ${USER} ln -fs $(dirname $my_dir)/templates/phpsysinfo.ini ${HOME}/phpsysinfo/
 sudo -u ${USER} ln -fs $(dirname $my_dir)/templates/green_bootstrap.css ${HOME}/phpsysinfo/templates/
