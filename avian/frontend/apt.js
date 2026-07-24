@@ -191,7 +191,11 @@
   }
   applyTheme(readLS('bird:theme', 'light'));
   var winBtns = [].slice.call(winPick.querySelectorAll('button'));
-  var currentHours = +readLS('bird:window', '1') || 1;
+  // v2 deliberately ignores the original stored 24H preference so existing
+  // kiosk installations adopt the new 1H default once, then remember any
+  // subsequent choice made by an interactive user.
+  var windowStorageKey = 'bird:window:v2';
+  var currentHours = +readLS(windowStorageKey, '1') || 1;
   winBtns.forEach(function (b) {
     b.setAttribute('aria-current', (+b.dataset.h === currentHours) ? 'true' : 'false');
   });
@@ -199,7 +203,7 @@
     b.addEventListener('click', function () {
       winBtns.forEach(function (x) { x.setAttribute('aria-current', x === b ? 'true' : 'false'); });
       currentHours = +b.dataset.h;
-      writeLS('bird:window', String(currentHours));
+      writeLS(windowStorageKey, String(currentHours));
       syncPill(winPick);
       // Actual data refresh is wired below via refreshRecent().
     });
