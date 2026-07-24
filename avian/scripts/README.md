@@ -12,6 +12,27 @@ this directory.
 3. `build_masks.py` rebuilds the collage silhouette masks into `dims.json` + `masks.json`, which `apt.js` fetches at load.
 4. `verify.py` (optional) runs an adversarial species-ID + anatomy check.
 
+## Growing all three Brisbane libraries
+
+`report_missing_illustrations.py` reads the Pi's detections and compares them
+with the standard, fun and Wes Anderson cutout libraries. Its Markdown report
+includes detection counts, confidence, the required filename stem, a
+prompt-ready species list and both pose filenames.
+
+```bash
+# Species without complete artwork during the rolling last 24 hours
+python3 avian/scripts/report_missing_illustrations.py
+
+# Never lose a species when it rolls out of the 24-hour window
+python3 avian/scripts/report_missing_illustrations.py \
+  --hours 1000000 \
+  --output "_Brief Files/missing-bird-illustrations.md"
+```
+
+Review a species' recordings before generating artwork when it has only one
+detection or low confidence. Re-run the all-history report after installing
+new images; completed species disappear from the list automatically.
+
 ```bash
 pip install -r requirements.txt
 export GEMINI_API_KEY='your-key'
