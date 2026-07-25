@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,8 +42,28 @@ def fetch_recent(api_url: str, hours: int) -> dict:
     try:
         with urlopen(url, timeout=15) as response:
             return json.load(response)
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as error:
-        raise RuntimeError(f"could not read BirdNET-Pi API at {url}: {error}") from error
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as python_error:
+        # Python's resolver does not consistently send .local lookups through
+        # Bonjour on macOS. curl does, so use it as a no-shell fallback.
+        try:
+            result = subprocess.run(
+                ["curl", "-fsS", "--max-time", "15", url],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return json.loads(result.stdout)
+        except (
+            FileNotFoundError,
+            subprocess.CalledProcessError,
+            json.JSONDecodeError,
+        ) as curl_error:
+            raise RuntimeError(
+                f"could not read BirdNET-Pi API at {url}; "
+                f"Python: {python_error}; curl fallback: {curl_error}. "
+                "If birdnet.local is unavailable, pass the Pi's numeric address "
+                "with --api http://PI_ADDRESS/avian/api/birdnet-api.php"
+            ) from curl_error
 
 
 def find_missing(data: dict, assets: Path) -> list[dict]:

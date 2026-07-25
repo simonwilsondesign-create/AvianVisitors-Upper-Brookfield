@@ -27,6 +27,12 @@ python3 avian/scripts/report_missing_illustrations.py
 python3 avian/scripts/report_missing_illustrations.py \
   --hours 1000000 \
   --output "_Brief Files/missing-bird-illustrations.md"
+
+# If macOS cannot resolve birdnet.local, use the Pi's numeric address
+python3 avian/scripts/report_missing_illustrations.py \
+  --api http://192.168.3.144/avian/api/birdnet-api.php \
+  --hours 1000000 \
+  --output "_Brief Files/missing-bird-illustrations.md"
 ```
 
 Review a species' recordings before generating artwork when it has only one
