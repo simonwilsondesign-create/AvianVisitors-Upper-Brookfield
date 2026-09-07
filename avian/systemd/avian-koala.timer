@@ -3,7 +3,7 @@ Description=Poll BirdNET recordings for koalas overnight
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=5sec
+OnUnitActiveSec=2sec
 Persistent=true
 Unit=avian-koala.service
 

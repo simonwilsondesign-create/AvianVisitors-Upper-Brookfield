@@ -130,7 +130,7 @@ def main() -> int:
     initialise(db)
     completed = 0
     for recording in recordings:
-        if now.timestamp() - recording.stat().st_mtime < 8:
+        if now.timestamp() - recording.stat().st_mtime < 5:
             continue
         completed += int(process(recording, args, db))
     print(json.dumps({"active": True, "window_end": end.isoformat(), "processed": completed}))
