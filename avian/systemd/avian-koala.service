@@ -1,0 +1,18 @@
+[Unit]
+Description=AvianVisitors koala recogniser
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/BirdNET-Pi
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/flock -n /var/lib/avian-koala/service.lock /opt/avian-koala/venv/bin/python /home/pi/BirdNET-Pi/avian/scripts/koala_worker.py
+TimeoutStartSec=3min
+Nice=15
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=read-only
+ReadWritePaths=/var/lib/avian-koala

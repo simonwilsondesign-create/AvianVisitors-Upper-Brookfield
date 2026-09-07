@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll BirdNET recordings for koalas overnight
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=20sec
+Persistent=true
+Unit=avian-koala.service
+
+[Install]
+WantedBy=timers.target
