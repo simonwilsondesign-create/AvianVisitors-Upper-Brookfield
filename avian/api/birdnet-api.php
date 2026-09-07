@@ -6,6 +6,7 @@
 //   stats       - totals (detections, unique species, today, last hour)
 //   lifelist    - every species with first_seen, last_seen, total_count
 //   recent      - &hours=N (default 24): species heard in the window
+//   overnight   - previous 18:00–06:00 site-local night, configurable
 //   species     - &sci=<sci_name>: per-species detail page
 //   timeseries  - &days=N: daily detection counts per species
 //   firstseen   - every species' earliest detection
@@ -15,7 +16,9 @@
 // /avian/api/* path - see avian/forwarding/.
 
 declare(strict_types=1);
-require_once __DIR__ . '/taxonomy.php';
+require_once __DIR__ . '/detection-windows.php';
+date_default_timezone_set(av_display_timezone()->getName());
+$now = av_detection_now();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: public, max-age=30');
 
@@ -44,12 +47,7 @@ try {
 }
 
 function rows(SQLite3 $db, string $sql, array $bind = []): array {
-    $stmt = $db->prepare($sql);
-    foreach ($bind as $k => $v) $stmt->bindValue($k, $v);
-    $res = $stmt->execute();
-    $out = [];
-    while ($r = $res->fetchArray(SQLITE3_ASSOC)) $out[] = $r;
-    return $out;
+    return av_detection_rows($db, $sql, $bind);
 }
 function one(SQLite3 $db, string $sql, array $bind = []) {
     $r = rows($db, $sql, $bind);
@@ -64,11 +62,12 @@ switch ($action) {
     case 'stats': {
         $total       = (int)(one($db, 'SELECT COUNT(*) AS n FROM detections')['n'] ?? 0);
         $species     = (int)(one($db, "SELECT COUNT(DISTINCT $canonicalSci) AS n FROM detections")['n'] ?? 0);
-        $today       = (int)(one($db, "SELECT COUNT(*) AS n FROM detections WHERE Date = DATE('now','localtime')")['n'] ?? 0);
-        $todaySpec   = (int)(one($db, "SELECT COUNT(DISTINCT $canonicalSci) AS n FROM detections WHERE Date = DATE('now','localtime')")['n'] ?? 0);
-        $lastHour    = (int)(one($db, "SELECT COUNT(*) AS n FROM detections WHERE Date = DATE('now','localtime') AND Time >= TIME('now','localtime','-1 hour')")['n'] ?? 0);
-        $week        = (int)(one($db, "SELECT COUNT(*) AS n FROM detections WHERE Date >= DATE('now','localtime','-7 day')")['n'] ?? 0);
-        $weekSpec    = (int)(one($db, "SELECT COUNT(DISTINCT $canonicalSci) AS n FROM detections WHERE Date >= DATE('now','localtime','-7 day')")['n'] ?? 0);
+        $dayCounts = av_window_count($db, $now->setTime(0, 0), $now);
+        $hourCounts = av_window_count($db, $now->modify('-1 hour'), $now);
+        $weekCounts = av_window_count($db, $now->modify('-7 days'), $now);
+        $today = (int)$dayCounts['n']; $todaySpec = (int)$dayCounts['species'];
+        $lastHour = (int)$hourCounts['n'];
+        $week = (int)$weekCounts['n']; $weekSpec = (int)$weekCounts['species'];
         $first       = one($db, 'SELECT MIN(Date) AS d FROM detections');
         echo json_encode([
             'totals'    => ['detections' => $total, 'species' => $species],
@@ -98,30 +97,24 @@ switch ($action) {
         // "ALL" button can turn off the time filter without needing a
         // separate code path.
         $hours = max(1, min(1000000, (int)($_GET['hours'] ?? 24)));
-        // species-collapsed view: one row per species seen in the window,
-        // with the file of its highest-confidence detection inside the window.
-        $rs = rows($db,
-          "SELECT $canonicalSci AS sci, MAX(Com_Name) AS com, COUNT(*) AS n, MAX(Confidence) AS best_conf, "
-        . "       MAX(Date||' '||Time) AS last_seen "
-        . "FROM detections "
-        . "WHERE (julianday('now','localtime') - julianday(Date||' '||Time)) * 24 <= :hrs "
-        . "GROUP BY $canonicalSci ORDER BY last_seen DESC",
-          [':hrs' => $hours]
-        );
-        // for each row, attach the file of the top-confidence detection in the window
-        foreach ($rs as &$r) {
-            $best = one($db,
-              "SELECT File_Name AS file, Date AS d, Time AS t, Confidence AS conf "
-            . "FROM detections "
-            . "WHERE $canonicalSci = :sn "
-            . "AND (julianday('now','localtime') - julianday(Date||' '||Time)) * 24 <= :hrs "
-            . "ORDER BY Confidence DESC LIMIT 1",
-              [':sn' => $r['sci'], ':hrs' => $hours]
-            );
-            $r['top_file'] = $best['file'] ?? null;
-            $r['top_at']   = isset($best['d']) ? ($best['d'].' '.$best['t']) : null;
-        }
-        echo json_encode(['hours' => $hours, 'species' => $rs, 'as_of' => date('c')]);
+        $rs = av_window_species($db, $now->modify("-$hours hours"), $now);
+        echo json_encode(['hours' => $hours, 'species' => $rs, 'as_of' => $now->format(DATE_ATOM),
+            'timezone' => av_display_timezone()->getName()]);
+        break;
+    }
+
+    case 'overnight': {
+        $window = av_overnight_window($now, av_display_settings());
+        $rs = av_window_species($db, $window['start'], $window['end'], false);
+        echo json_encode([
+            'species' => $rs, 'visible' => $window['visible'],
+            'interval_start_iso' => $window['start']->format(DATE_ATOM),
+            'interval_end_iso' => $window['end']->format(DATE_ATOM),
+            'display_start_iso' => $window['display_start']->format(DATE_ATOM),
+            'display_end_iso' => $window['display_end']->format(DATE_ATOM),
+            'timezone' => av_display_timezone()->getName(),
+            'as_of' => $now->format(DATE_ATOM), 'as_of_iso' => $now->format(DATE_ATOM),
+        ]);
         break;
     }
 

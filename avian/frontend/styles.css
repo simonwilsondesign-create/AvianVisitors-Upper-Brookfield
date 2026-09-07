@@ -97,8 +97,9 @@
      keeps normal scroll. */
   .view#v0, .view#v1 { overflow: hidden; padding: 8px 32px 88px; }
   .view#v0 { display: flex; }
+  .view#v0.has-overnight { padding-bottom: 150px; }
   .view#v1 { display: flex; flex-direction: column; }
-  @media (max-width: 700px) { .view { padding: 8px 18px 132px; } .view#v0, .view#v1 { padding: 8px 16px 88px; } }
+  @media (max-width: 700px) { .view { padding: 8px 18px 132px; } .view#v0, .view#v1 { padding: 8px 16px 88px; } .view#v0.has-overnight { padding-bottom: 138px; } }
 
   /* ============ Top bar - window picker (left) + menu button (right). ============
      Visible on every view; the picker is the universal time-window control. */
@@ -499,6 +500,30 @@
     flex: 1 1 auto; width: 100%; max-width: 1300px; margin: 0 auto;
     position: relative; min-height: 0;
   }
+  .gtile-caption {
+    position: absolute; left: 50%; bottom: -32px; transform: translateX(-50%);
+    width: max-content; max-width: min(210px, 100%); padding: 3px 7px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    background: var(--paper); color: var(--ink); border-radius: 4px;
+    box-shadow: var(--raised); font: 700 clamp(12px, 1.35vw, 22px)/1.15 ui-serif, Georgia, serif;
+    text-align: center; pointer-events: none; z-index: 2;
+  }
+  .artwork-pending img, .image-missing img { opacity: 0; }
+  .artwork-pending::before, .image-missing::before {
+    content: 'Illustration pending'; position: absolute; inset: 12% 0 12%; display: grid; place-items: center;
+    padding: 8px; background: var(--paper-3); color: var(--ink-soft); border-radius: 8px;
+    font: 9px/1.2 ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .overnight-strip { position: absolute; left: 32px; right: 32px; bottom: 78px; max-width: 1120px; margin: auto; padding: 9px 14px; background: color-mix(in srgb, var(--paper) 94%, transparent); border-top: 1px solid var(--hairline); }
+  .overnight-heading { font: 700 9px ui-monospace, Menlo, monospace; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px; }
+  .overnight-list { display: flex; gap: 12px 22px; overflow: hidden; }
+  .overnight-bird { display: flex; gap: 6px; white-space: nowrap; font: 12px/1.2 ui-serif, Georgia, serif; color: var(--ink); }
+  .overnight-bird span { font: 10px ui-monospace, Menlo, monospace; color: var(--ink-soft); }
+  .display-freshness { position: absolute; right: 36px; bottom: 12px; margin: 0; font: 9px ui-monospace, Menlo, monospace; color: var(--ink-soft); letter-spacing: .04em; }
+  .display-freshness.delayed { color: #a83a2d; }
+  .kiosk-labels-off .gtile-caption { display: none; }
+  .kiosk-overnight-off .overnight-strip { display: none; }
+  @media (max-width: 700px) { .overnight-strip { left: 16px; right: 16px; bottom: 72px; } .display-freshness { right: 18px; bottom: 8px; } .gtile-caption { font-size: 11px; bottom: -26px; } }
   /* Centre-out bloom: each tile fades + scales in; JS staggers the
      animation-delay by distance from the cluster centre. backwards
      fill-mode holds the hidden start state through the delay, and we keep
@@ -550,7 +575,7 @@
      cursor. */
   .gtile.is-hover { transform: scale(1.04); z-index: 3; }
   .gtile img {
-    width: 100%; height: 100%; object-fit: contain; display: block;
+    width: 100%; height: calc(100% - 54px); object-fit: contain; display: block;
     /* Cutouts arrive as alpha-bbox-cropped transparent-bg PNGs, so
        object-fit: contain leaves no whitespace inside the tile - the
        bird touches all four sides. Soft drop shadow keeps it readable
@@ -581,6 +606,7 @@
     z-index: 4;
   }
   .collage-tip[aria-hidden="false"] { opacity: 1; }
+  .collage-page { position: absolute; right: 8px; bottom: 14px; font: 9px ui-monospace, Menlo, monospace; color: var(--ink-soft); letter-spacing: .08em; text-transform: uppercase; }
   .collage-tip .ct-name { font-style: normal; font-weight: 600; }
   .collage-tip .ct-n { font-style: normal; font-weight: 700; }
   .collage-tip .ct-w { color: var(--ink-soft); }

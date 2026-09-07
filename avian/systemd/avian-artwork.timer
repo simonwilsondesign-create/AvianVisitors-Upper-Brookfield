@@ -1,0 +1,11 @@
+[Unit]
+Description=Run AvianVisitors artwork inventory every Monday
+
+[Timer]
+OnCalendar=Mon *-*-* 10:00:00 Australia/Brisbane
+Persistent=true
+RandomizedDelaySec=10m
+Unit=avian-artwork.service
+
+[Install]
+WantedBy=timers.target

@@ -36,12 +36,27 @@ def slugify(scientific_name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", scientific_name.lower()).strip("-")
 
 
+def validate_response(data: object) -> dict:
+    """Reject API failures rather than accidentally treating them as no birds."""
+    if not isinstance(data, dict):
+        raise RuntimeError("BirdNET response must be an object")
+    if data.get("error"):
+        raise RuntimeError(f"BirdNET API error: {data['error']}")
+    species = data.get("species")
+    if not isinstance(species, list):
+        raise RuntimeError("BirdNET response has no species array")
+    for index, item in enumerate(species):
+        if not isinstance(item, dict) or not str(item.get("sci", "")).strip():
+            raise RuntimeError(f"invalid species entry at index {index}")
+    return data
+
+
 def fetch_recent(api_url: str, hours: int) -> dict:
     separator = "&" if "?" in api_url else "?"
     url = api_url + separator + urlencode({"action": "recent", "hours": hours})
     try:
         with urlopen(url, timeout=15) as response:
-            return json.load(response)
+            return validate_response(json.load(response))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as python_error:
         # Python's resolver does not consistently send .local lookups through
         # Bonjour on macOS. curl does, so use it as a no-shell fallback.
@@ -52,7 +67,7 @@ def fetch_recent(api_url: str, hours: int) -> dict:
                 capture_output=True,
                 text=True,
             )
-            return json.loads(result.stdout)
+            return validate_response(json.loads(result.stdout))
         except (
             FileNotFoundError,
             subprocess.CalledProcessError,
@@ -64,6 +79,18 @@ def fetch_recent(api_url: str, hours: int) -> dict:
                 "If birdnet.local is unavailable, pass the Pi's numeric address "
                 "with --api http://PI_ADDRESS/avian/api/birdnet-api.php"
             ) from curl_error
+
+
+def valid_png(path: Path) -> bool:
+    """A filename alone is not usable artwork: require readable nonempty alpha."""
+    try:
+        from PIL import Image
+        with Image.open(path) as image:
+            image.load()
+            return (image.format == "PNG" and image.width > 8 and image.height > 8
+                    and "A" in image.getbands() and image.getchannel("A").getbbox() is not None)
+    except (OSError, ValueError):
+        return False
 
 
 def find_missing(data: dict, assets: Path) -> list[dict]:
@@ -78,7 +105,7 @@ def find_missing(data: dict, assets: Path) -> list[dict]:
         missing_by_library: dict[str, list[str]] = {}
         for label, directory in LIBRARIES.items():
             cutouts = assets / directory / "cutouts"
-            absent = [filename for filename in required if not (cutouts / filename).is_file()]
+            absent = [filename for filename in required if not valid_png(cutouts / filename)]
             if absent:
                 missing_by_library[label] = absent
         if missing_by_library:
@@ -154,18 +181,19 @@ def main() -> int:
     parser.add_argument(
         "--hours",
         type=int,
-        default=24,
-        help="rolling detection window; use 1000000 for all history (default: 24)",
+        default=1000000,
+        help="rolling detection window; all recorded history by default",
     )
     parser.add_argument("--input", type=Path, help="read a saved recent-API JSON file instead")
     parser.add_argument("--output", type=Path, help="write Markdown here instead of stdout")
+    parser.add_argument("--json-output", type=Path, help="write structured queue input JSON")
     args = parser.parse_args()
 
     if args.hours < 1:
         parser.error("--hours must be at least 1")
 
     try:
-        data = json.loads(args.input.read_text()) if args.input else fetch_recent(args.api, args.hours)
+        data = validate_response(json.loads(args.input.read_text())) if args.input else fetch_recent(args.api, args.hours)
         missing = find_missing(data, avian_root / "assets" / "illustration-libraries")
         report = markdown_report(missing, args.hours, str(data.get("as_of", "")))
     except (OSError, RuntimeError, json.JSONDecodeError) as error:
@@ -176,8 +204,14 @@ def main() -> int:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(report)
         print(f"wrote {len(missing)} missing species to {args.output}")
-    else:
+    elif not args.json_output:
         print(report, end="")
+    if args.json_output:
+        args.json_output.parent.mkdir(parents=True, exist_ok=True)
+        args.json_output.write_text(json.dumps({
+            "schema": 1, "generated_at": datetime.now(timezone.utc).isoformat(),
+            "as_of": data.get("as_of"), "hours": args.hours, "species": missing,
+        }, indent=2, sort_keys=True) + "\n")
     return 0
 
 

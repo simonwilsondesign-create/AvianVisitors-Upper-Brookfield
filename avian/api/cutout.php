@@ -40,9 +40,10 @@ $pose = (int)($_GET['pose'] ?? 1);
 if ($pose < 1 || $pose > 99) $pose = 1;
 $poseSuffix = $pose === 1 ? '' : "-$pose";
 
-function serve_png(string $path): void {
+function serve_png(string $path, ?string $revision = null): void {
     header('Content-Type: image/png');
-    header('Cache-Control: public, max-age=86400');
+    header('Cache-Control: public, max-age=' . ($revision ? '31536000, immutable' : '86400'));
+    if ($revision) header('X-Avian-Artwork-Revision: ' . $revision);
     header('Content-Length: ' . (string)filesize($path));
     readfile($path);
     exit;
@@ -52,29 +53,42 @@ function serve_png(string $path): void {
 //    standard Brisbane birds, Friday the fun character birds, and weekends
 //    the storybook portraits. ?library=standard|fun|wes is a safe test override.
 $library = av_resolve_library();
-$bundled = $library['definition']['illustrations'] . "/{$slug}{$poseSuffix}.png";
+$requestedRevision = trim((string)($_GET['revision'] ?? ''));
+$release = $library['release'];
+if ($requestedRevision !== '') {
+    $release = av_named_release($library['key'], $requestedRevision);
+    if (!$release) {
+        http_response_code(409); header('Content-Type: text/plain; charset=utf-8');
+        echo 'requested artwork revision is unavailable'; exit;
+    }
+}
+$illustrations = $release ? $release['directory'] . '/illustrations' : $library['definition']['illustrations'];
+$revision = $release['revision'] ?? null;
+$bundled = $illustrations . "/{$slug}{$poseSuffix}.png";
 if (is_file($bundled) && filesize($bundled) > 1024) {
-    serve_png($bundled);
+    serve_png($bundled, $revision);
 }
 // Pose-2 missing? Fall back to pose-1 so the flight tab still shows
 // the perched render instead of breaking to the photo fallback.
 if ($pose !== 1) {
-    $fallback = $library['definition']['illustrations'] . "/$slug.png";
+    $fallback = $illustrations . "/$slug.png";
     if (is_file($fallback) && filesize($fallback) > 1024) {
-        serve_png($fallback);
+        serve_png($fallback, $revision);
     }
 }
 // A scheduled library may be incomplete while artwork is being prepared.
 // Fall back to the approved standard library for the requested pose/species.
 if ($library['key'] !== 'standard') {
-    $standard = $library['standard']['illustrations'] . "/{$slug}{$poseSuffix}.png";
+    $standardRelease = av_release('standard');
+    $standardDir = $standardRelease ? $standardRelease['directory'] . '/illustrations' : $library['standard']['illustrations'];
+    $standard = $standardDir . "/{$slug}{$poseSuffix}.png";
     if (is_file($standard) && filesize($standard) > 1024) {
-        serve_png($standard);
+        serve_png($standard, $standardRelease['revision'] ?? null);
     }
     if ($pose !== 1) {
-        $standardPrimary = $library['standard']['illustrations'] . "/$slug.png";
+        $standardPrimary = $standardDir . "/$slug.png";
         if (is_file($standardPrimary) && filesize($standardPrimary) > 1024) {
-            serve_png($standardPrimary);
+            serve_png($standardPrimary, $standardRelease['revision'] ?? null);
         }
     }
 }

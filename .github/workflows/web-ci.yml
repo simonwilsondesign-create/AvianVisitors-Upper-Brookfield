@@ -1,0 +1,43 @@
+name: Web API checks
+
+on:
+  push:
+    branches: [main, upper-brookfield]
+    paths:
+      - 'avian/api/**'
+      - 'avian/frontend/**/*.js'
+      - 'tests/php/**'
+      - '.github/workflows/web-ci.yml'
+  pull_request:
+    branches: [main, upper-brookfield]
+    paths:
+      - 'avian/api/**'
+      - 'avian/frontend/**/*.js'
+      - 'tests/php/**'
+      - '.github/workflows/web-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check PHP syntax
+        run: find avian/api -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Test display settings and endpoint access controls
+        run: |
+          php tests/php/test_display_settings.php
+          php tests/php/test_detection_windows.php
+          bash tests/php/test_display_config.sh
+
+  javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check frontend JavaScript syntax
+        run: find avian/frontend -name '*.js' -print0 | xargs -0 -n1 node --check
