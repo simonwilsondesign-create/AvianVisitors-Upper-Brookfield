@@ -351,7 +351,7 @@
   var collagePose = {}; // sci -> 1 perched | 2 flight, persisted across polls;
   var collagePageSeconds = 15;
   var displaySettings = { night_start_hour: 18, night_end_hour: 6 };
-  var COLLAGE_LABEL_SPACE = 54;
+  var COLLAGE_LABEL_SPACE = 30;
   // cleared when a bird leaves the window so it rerolls.
 
   // Decode and cache each mask once. Sparse cell-list form (only "on"

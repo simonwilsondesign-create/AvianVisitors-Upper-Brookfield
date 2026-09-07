@@ -501,11 +501,11 @@
     position: relative; min-height: 0;
   }
   .gtile-caption {
-    position: absolute; left: 50%; bottom: -32px; transform: translateX(-50%);
-    width: max-content; max-width: min(210px, 100%); padding: 3px 7px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
+    width: max-content; max-width: min(160px, 100%); padding: 2px 5px;
+    overflow: visible; white-space: normal;
     background: var(--paper); color: var(--ink); border-radius: 4px;
-    box-shadow: var(--raised); font: 700 clamp(12px, 1.35vw, 22px)/1.15 ui-serif, Georgia, serif;
+    box-shadow: var(--raised); font: 700 clamp(7px, .7vw, 11px)/1.1 ui-serif, Georgia, serif;
     text-align: center; pointer-events: none; z-index: 2;
   }
   .artwork-pending img, .image-missing img { opacity: 0; }
@@ -523,7 +523,7 @@
   .display-freshness.delayed { color: #a83a2d; }
   .kiosk-labels-off .gtile-caption { display: none; }
   .kiosk-overnight-off .overnight-strip { display: none; }
-  @media (max-width: 700px) { .overnight-strip { left: 16px; right: 16px; bottom: 72px; } .display-freshness { right: 18px; bottom: 8px; } .gtile-caption { font-size: 11px; bottom: -26px; } }
+  @media (max-width: 700px) { .overnight-strip { left: 16px; right: 16px; bottom: 72px; } .display-freshness { right: 18px; bottom: 8px; } .gtile-caption { font-size: 8px; bottom: 2px; } }
   /* Centre-out bloom: each tile fades + scales in; JS staggers the
      animation-delay by distance from the cluster centre. backwards
      fill-mode holds the hidden start state through the delay, and we keep
@@ -575,7 +575,7 @@
      cursor. */
   .gtile.is-hover { transform: scale(1.04); z-index: 3; }
   .gtile img {
-    width: 100%; height: calc(100% - 54px); object-fit: contain; display: block;
+    width: 100%; height: calc(100% - 30px); object-fit: contain; display: block;
     /* Cutouts arrive as alpha-bbox-cropped transparent-bg PNGs, so
        object-fit: contain leaves no whitespace inside the tile - the
        bird touches all four sides. Soft drop shadow keeps it readable
