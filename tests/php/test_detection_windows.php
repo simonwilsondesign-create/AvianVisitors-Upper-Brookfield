@@ -27,6 +27,6 @@ foreach ($birds as $bird) {
 $window = av_overnight_window(new DateTimeImmutable('2026-09-07 08:00:00', $timezone), av_display_defaults());
 check($window['visible'] === true, 'morning strip is visible at 08:00');
 check($window['start']->format('Y-m-d H:i:s') === '2026-09-06 18:00:00', 'overnight starts previous evening');
-$window = av_overnight_window(new DateTimeImmutable('2026-09-07 12:00:00', $timezone), av_display_defaults());
-check($window['visible'] === false, 'morning strip ends at noon');
+$window = av_overnight_window(new DateTimeImmutable('2026-09-07 09:00:00', $timezone), av_display_defaults());
+check($window['visible'] === false, 'morning strip ends at 09:00');
 echo "detection window tests passed\n";

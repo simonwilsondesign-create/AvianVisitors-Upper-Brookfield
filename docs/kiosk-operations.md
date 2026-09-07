@@ -35,7 +35,7 @@ database.
 The default kiosk profile is:
 
 ```json
-{"profile":"kiosk","labels":true,"overnight_enabled":true,"night_start_hour":18,"night_end_hour":6,"morning_end_hour":12,"page_seconds":15,"theme":"light","default_hours":1,"kiosk_idle_seconds":120,"timezone":"Australia/Brisbane","revision":0}
+{"profile":"kiosk","labels":true,"overnight_enabled":true,"night_start_hour":18,"night_end_hour":6,"morning_end_hour":9,"page_seconds":15,"theme":"light","default_hours":1,"kiosk_idle_seconds":120,"timezone":"Australia/Brisbane","revision":0}
 ```
 
 Writes are `POST` JSON requests to the same endpoint. They accept only the

@@ -25,7 +25,7 @@ function av_display_defaults(): array {
         'overnight_enabled' => true,
         'night_start_hour' => 18,
         'night_end_hour' => 6,
-        'morning_end_hour' => 12,
+        'morning_end_hour' => 9,
         'page_seconds' => 15,
         'theme' => 'light',
         'default_hours' => 1,

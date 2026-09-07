@@ -121,7 +121,7 @@ Suggested configurable defaults:
 
 - Site timezone: `Australia/Brisbane`, shared by detection windows, library schedule, labels, and display settings.
 - Overnight interval: previous day 18:00 inclusive to today 06:00 exclusive.
-- Morning strip visible: 06:00 inclusive to 12:00 exclusive. Outside this period, hide it automatically.
+- Morning strip visible: 06:00 inclusive to 09:00 exclusive. Outside this period, hide it automatically.
 - Show it alongside the 1H view. Keep 12H/24H/7D/ALL meanings unchanged; avoid a redundant strip in those views.
 - Include all eligible overnight species initially, not only owls. Prioritise configurable favourites/nocturnal visitors, then less frequent visitors, with deterministic tie-breaking. Label these as detections rather than confirmed individuals.
 - If a species is also in the live hour, show it once in the main area with a small “Also heard last night” annotation. It returns to the overnight strip if it ages out of the live window during the morning.
@@ -131,7 +131,7 @@ Add a server-side overnight endpoint returning explicit interval boundaries, tim
 
 Derive overnight data from stored detections, not browser memory: it must work after a morning reboot. Refresh at morning boundaries and during the normal polling lifecycle. Compute bounded timestamp queries centrally; do not approximate “last night” as the previous 12 hours. Longer term, sunrise/sunset windows could be optional, but fixed local hours are easier to understand and test first.
 
-Acceptance: a 02:00 owl appears at 08:00 without being added to the live-hour count; an 18:00 detection belongs to the night and a 06:00 detection does not; the strip expires at noon; rebooting at 09:00 preserves it; duplicate live/overnight species have correct annotations and counts; remote timezone changes do not alter the site's night; failed queries retain clearly dated last-good data or show unavailability.
+Acceptance: a 02:00 owl appears at 08:00 without being added to the live-hour count; an 18:00 detection belongs to the night and a 06:00 detection does not; the strip expires at 09:00; rebooting at 08:00 preserves it; duplicate live/overnight species have correct annotations and counts; remote timezone changes do not alter the site's night; failed queries retain clearly dated last-good data or show unavailability.
 
 ## 5. Unattended operation and remote UX
 
