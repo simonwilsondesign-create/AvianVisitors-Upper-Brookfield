@@ -11,7 +11,7 @@ WorkingDirectory=/home/pi/BirdNET-Pi
 Environment=PYTHONUNBUFFERED=1
 Environment=AV_BIRDNET_API=http://127.0.0.1/avian/api/birdnet-api.php
 EnvironmentFile=-/etc/avian/artwork.env
-ExecStart=/usr/bin/flock -n /var/lib/avian-artwork/service.lock /usr/bin/python3 /home/pi/BirdNET-Pi/avian/scripts/artwork_worker.py --api ${AV_BIRDNET_API} --state /var/lib/avian-artwork/state.sqlite --work-dir /var/lib/avian-artwork
+ExecStart=/usr/bin/flock -n /var/lib/avian-artwork/service.lock /home/pi/BirdNET-Pi/birdnet/bin/python3 /home/pi/BirdNET-Pi/avian/scripts/artwork_worker.py --api ${AV_BIRDNET_API} --state /var/lib/avian-artwork/state.sqlite --work-dir /var/lib/avian-artwork
 TimeoutStartSec=15min
 Nice=10
 IOSchedulingClass=idle
