@@ -703,7 +703,7 @@
       var caption = document.createElement('span');
       caption.className = 'gtile-caption'; caption.textContent = s.com || s.sci || 'Unidentified bird';
       btn.appendChild(image); btn.appendChild(caption);
-      if (currentHours === 1 && DATA.overnight && Array.isArray(DATA.overnight.species) && DATA.overnight.species.some(function (n) { return n.sci === s.sci; })) {
+      if (currentHours === 1 && DATA.overnight && DATA.overnight.visible !== false && Array.isArray(DATA.overnight.species) && DATA.overnight.species.some(function (n) { return n.sci === s.sci; })) {
         caption.textContent += ' · last night';
       }
       if (r.artworkPending) btn.classList.add('artwork-pending');
