@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=avian
-Group=avian
+User=birdnet
+Group=birdnet
 WorkingDirectory=/home/birdnet/BirdNET-Pi
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=-/etc/avian/artwork.env
