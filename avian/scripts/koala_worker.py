@@ -130,7 +130,10 @@ def main() -> int:
     initialise(db)
     completed = 0
     for recording in recordings:
-        if now.timestamp() - recording.stat().st_mtime < 5:
+        # BirdNET keeps updating a recording's mtime until it removes it, so
+        # file age is not a useful completion signal. A one-megabyte WAV is a
+        # stable, several-second snapshot that AviaNZ can analyse in isolation.
+        if recording.stat().st_size < 1_000_000:
             continue
         completed += int(process(recording, args, db))
     print(json.dumps({"active": True, "window_end": end.isoformat(), "processed": completed}))
