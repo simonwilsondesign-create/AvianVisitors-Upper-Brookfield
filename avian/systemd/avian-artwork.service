@@ -18,4 +18,4 @@ IOSchedulingClass=idle
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectHome=read-only
-ReadWritePaths=/var/lib/avian-artwork /home/pi/BirdNET-Pi/avian/assets/illustration-releases
+ReadWritePaths=/var/lib/avian-artwork
