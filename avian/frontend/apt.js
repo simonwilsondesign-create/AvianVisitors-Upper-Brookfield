@@ -991,6 +991,7 @@
     firstseen: null,    // ./avian/api/birdnet-api.php?action=firstseen (newest lifelist additions)
     recent: null,       // ./avian/api/birdnet-api.php?action=recent&hours=N (refetched on picker change)
     overnight: null,
+    koala: null,
   };
   var lastSuccessAt = 0, refreshActive = false, refreshSerial = 0, retryDelay = 1000, retryTimer = null;
   function setFreshness(message, delayed) {
@@ -1533,6 +1534,7 @@
       fetchJson('./avian/api/birdnet-api.php?action=firstseen&limit=10').catch(function () { return undefined; }),
       fetchJson('./avian/api/birdnet-api.php?action=recent&hours=' + forHours).catch(function () { return undefined; }),
       fetchJson('./avian/api/birdnet-api.php?action=overnight').catch(function () { return undefined; }),
+      fetchJson('./avian/api/koala.php').catch(function () { return undefined; }),
     ]).then(function (parts) {
       if (serial !== refreshSerial) return;
       if (!parts.some(function (part) { return part !== undefined; })) {
@@ -1553,10 +1555,12 @@
       // since this poll started - otherwise keep what's there.
       if (forHours === currentHours && parts[4]) DATA.recent = parts[4];
       if (parts[5]) DATA.overnight = parts[5];
+      if (parts[6]) DATA.koala = parts[6];
       recomputeDerived();
       renderTimeIndependent(animate);
       renderCollageFromData(animate);
       renderOvernight();
+      renderKoala();
       checkIllustrationRevision();
       lastSuccessAt = Date.now(); retryDelay = 1000;
       setFreshness('Updated ' + new Date(lastSuccessAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
@@ -1601,6 +1605,15 @@
       item.appendChild(name); item.appendChild(when); list.appendChild(item);
     });
     el.appendChild(list);
+  }
+
+  function renderKoala() {
+    var el = document.getElementById('koalaPresence'), koala = DATA.koala;
+    if (!el) return;
+    if (!koala || koala.visible !== true || !koala.candidate) { el.hidden = true; return; }
+    var when = koala.candidate.detected_at ? new Date(koala.candidate.detected_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'overnight';
+    el.innerHTML = '<img src="./avian/assets/illustration-libraries/brisbane-wes-anderson/generated/phascolarctos-cinereus.png" alt="Koala illustration"><div><strong>Koala heard</strong><span>' + when + ' · review candidate</span></div>';
+    el.hidden = false;
   }
 
   function checkIllustrationRevision() {
