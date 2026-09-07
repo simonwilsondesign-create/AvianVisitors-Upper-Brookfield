@@ -521,11 +521,11 @@
   .overnight-bird span { font: 10px ui-monospace, Menlo, monospace; color: var(--ink-soft); }
   .display-freshness { position: absolute; right: 36px; bottom: 12px; margin: 0; font: 9px ui-monospace, Menlo, monospace; color: var(--ink-soft); letter-spacing: .04em; }
   .display-freshness.delayed { color: #a83a2d; }
-  .koala-presence { position: absolute; left: 38px; bottom: 18px; z-index: 5; display: flex; align-items: end; gap: 6px; padding: 4px 8px 4px 3px; background: color-mix(in srgb, var(--paper) 94%, transparent); border-radius: 8px; box-shadow: var(--raised); color: var(--ink); }
-  .koala-presence img { width: 58px; height: 76px; object-fit: contain; object-position: bottom; }
+  .koala-presence { position: absolute; left: 50%; top: 53%; transform: translate(-50%, -50%); z-index: 5; display: flex; align-items: end; gap: 10px; padding: 7px 13px 7px 5px; background: color-mix(in srgb, var(--paper) 94%, transparent); border-radius: 12px; box-shadow: var(--raised); color: var(--ink); }
+  .koala-presence img { width: 118px; height: 148px; object-fit: contain; object-position: bottom; }
   .koala-presence strong, .koala-presence span { display: block; }
-  .koala-presence strong { font: 700 11px ui-serif, Georgia, serif; }
-  .koala-presence span { font: 8px ui-monospace, Menlo, monospace; color: var(--ink-soft); }
+  .koala-presence strong { font: 700 18px ui-serif, Georgia, serif; }
+  .koala-presence span { font: 10px ui-monospace, Menlo, monospace; color: var(--ink-soft); }
   .kiosk-labels-off .gtile-caption { display: none; }
   .kiosk-overnight-off .overnight-strip { display: none; }
   @media (max-width: 700px) { .overnight-strip { left: 16px; right: 16px; bottom: 72px; } .display-freshness { right: 18px; bottom: 8px; } .gtile-caption { font-size: 8px; bottom: 2px; } }
