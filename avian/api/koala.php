@@ -21,7 +21,7 @@ if ($visible && is_file($path) && class_exists('SQLite3')) {
         $query->bindValue(':start', $start->format(DATE_ATOM), SQLITE3_TEXT);
         $query->bindValue(':end', $end->format(DATE_ATOM), SQLITE3_TEXT);
         $result = $query->execute();
-        $candidate = $result ? $result->fetchArray(SQLITE3_ASSOC) : null;
+        $candidate = $result ? ($result->fetchArray(SQLITE3_ASSOC) ?: null) : null;
         if ($result) $result->finalize();
         $query->close(); $db->close();
     } catch (Throwable $error) { $candidate = null; }
