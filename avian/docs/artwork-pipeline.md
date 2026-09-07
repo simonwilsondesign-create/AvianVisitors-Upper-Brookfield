@@ -46,10 +46,10 @@ It retains four releases. Roll back by atomically replacing `CURRENT` with the
 name of an existing validated release; never point it at a partial directory.
 
 Install scheduling on the Pi after creating the state directory for the
-existing `birdnet` service account:
+existing `pi` service account:
 
 ```sh
-sudo install -d -o birdnet -g birdnet /var/lib/avian-artwork
+sudo install -d -o pi -g pi /var/lib/avian-artwork
 sudo install -m 0644 avian/systemd/avian-artwork.{service,timer} /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now avian-artwork.timer

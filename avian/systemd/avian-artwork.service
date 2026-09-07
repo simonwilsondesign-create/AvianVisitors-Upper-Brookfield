@@ -5,16 +5,16 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=birdnet
-Group=birdnet
-WorkingDirectory=/home/birdnet/BirdNET-Pi
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/BirdNET-Pi
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=-/etc/avian/artwork.env
-ExecStart=/usr/bin/flock -n /var/lib/avian-artwork/service.lock /usr/bin/python3 /home/birdnet/BirdNET-Pi/avian/scripts/artwork_worker.py --api ${AV_BIRDNET_API:-http://127.0.0.1/avian/api/birdnet-api.php} --state /var/lib/avian-artwork/state.sqlite --work-dir /var/lib/avian-artwork
+ExecStart=/usr/bin/flock -n /var/lib/avian-artwork/service.lock /usr/bin/python3 /home/pi/BirdNET-Pi/avian/scripts/artwork_worker.py --api ${AV_BIRDNET_API:-http://127.0.0.1/avian/api/birdnet-api.php} --state /var/lib/avian-artwork/state.sqlite --work-dir /var/lib/avian-artwork
 TimeoutStartSec=15min
 Nice=10
 IOSchedulingClass=idle
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectHome=yes
-ReadWritePaths=/var/lib/avian-artwork /home/birdnet/BirdNET-Pi/avian/assets/illustration-releases
+ReadWritePaths=/var/lib/avian-artwork /home/pi/BirdNET-Pi/avian/assets/illustration-releases
