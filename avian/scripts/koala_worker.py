@@ -79,6 +79,16 @@ def contains_koala(value: object) -> bool:
     return False
 
 
+def recogniser_score(filter_file: Path) -> float | None:
+    """Return the supplied filter's true-positive rate as a display score."""
+    try:
+        data = json.loads(filter_file.read_text())
+        tpr = data["Filters"][0]["TPR, FPR"][0]
+        return max(0.0, min(1.0, float(tpr) / 100.0))
+    except (OSError, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
 def initialise(db: sqlite3.Connection) -> None:
     db.execute("CREATE TABLE IF NOT EXISTS processed (recording TEXT PRIMARY KEY, processed_at TEXT NOT NULL)")
     db.execute("CREATE TABLE IF NOT EXISTS detections (detected_at TEXT NOT NULL, confidence REAL, recording TEXT NOT NULL UNIQUE, status TEXT NOT NULL)")
@@ -102,7 +112,7 @@ def process(recording: Path, args: argparse.Namespace, db: sqlite3.Connection) -
     db.execute("INSERT INTO processed (recording, processed_at) VALUES (?, ?)", (recording.name, dt.datetime.now(TZ).isoformat()))
     if contains_koala(annotations):
         detected = recording_time(recording).isoformat()
-        db.execute("INSERT OR IGNORE INTO detections (detected_at, confidence, recording, status) VALUES (?, ?, ?, ?)", (detected, None, recording.name, "unreviewed"))
+        db.execute("INSERT OR IGNORE INTO detections (detected_at, confidence, recording, status) VALUES (?, ?, ?, ?)", (detected, args.score, recording.name, "unreviewed"))
         print(f"koala candidate: {recording.name}")
     db.commit()
     return True
@@ -117,7 +127,9 @@ def main() -> int:
     parser.add_argument("--avianz", default="/opt/avian-koala/AviaNZ/AviaNZ.py")
     parser.add_argument("--python", default="/opt/avian-koala/venv/bin/python")
     parser.add_argument("--home", default="/home/pi")
+    parser.add_argument("--filter", default="/home/pi/.avianz/Filters/Koala_CNN_LG_071223.txt")
     args = parser.parse_args()
+    args.score = recogniser_score(Path(args.filter))
     values = config_values(Path(args.config))
     latitude, longitude = float(values.get("LATITUDE", "-27.4704")), float(values.get("LONGITUDE", "153.026"))
     now = dt.datetime.now(TZ)
