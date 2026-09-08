@@ -7,11 +7,11 @@ calls are missed while a second model runs.
 
 ## Schedule
 
-Read `LATITUDE`, `LONGITUDE`, `RECS_DIR`, and `RECORDING_LENGTH` from
-`/etc/birdnet/birdnet.conf`. Calculate the local sun events in
-`Australia/Brisbane` using the installed `suntime` package. Process files only
-from one hour after sunset until the next sunrise. Files outside that window
-are recorded as intentionally skipped, rather than silently lost.
+Poll completed BirdNET recordings continuously. The worker analyses every
+eligible recording once and stores its checkpoint and any candidate WAV under
+`/var/lib/avian-koala`; it never deletes historical state. The display uses
+the rolling recent hour at any time and retains the previous night's candidates
+from the site's Brisbane-local sunrise through 09:00.
 
 The installed Pi configuration is `-27.4704, 153.026`, with 15-second WAVs in
 `/home/pi/BirdSongs/StreamData`.
@@ -26,9 +26,15 @@ do not adapt its files.
 The recogniser identifies male bellows. Treat each result as a candidate until
 the linked WAV is reviewed: the publisher identifies trucks, trains, and
 kookaburras as possible false positives. A candidate can appear in a separate
-"Koala heard overnight" display item, with the detection time, score, source
-recording and a review status. Only reviewed candidates count as a confirmed
+display item with the detection time, source recording and review status. The
+recogniser filter's published true-positive rate is review context, not a
+per-recording certainty score. Only reviewed candidates count as a confirmed
 koala observation.
+
+`/avian/api/koala.php?action=history` returns the newest 25 preserved
+candidates (up to 100 with `limit=`), including their review status and a safe
+link to each durable WAV. This supports review after the display window closes.
+The API includes a WAV link only while that preserved file exists.
 
 ## Installation boundary
 
@@ -37,6 +43,9 @@ under `/opt/avian-koala`; do not add their packages to BirdNET's environment.
 The koala service must have read-only access to BirdNET recordings and write
 only to `/var/lib/avian-koala`. A systemd timer should run every two minutes,
 with a lock and checkpoint database, after the recording service has started.
+Grant the PHP-FPM/Caddy reader account execute access to
+`/var/lib/avian-koala` and read access to `recordings/`; the public audio route
+is `/avian/api/koala-recording.php?recording=<wav-basename>`.
 
 The published recogniser is intended for offline WAV analysis. Verify a small,
 saved recording set on the Pi before enabling the scheduled listener, then

@@ -508,8 +508,12 @@
     return placed;
   }
 
-  function renderCollage(items, animate) {
-    var PAGE_SIZE = 12;
+  function renderCollage(items, animate, target, showDetectionTime) {
+    target = target || collage;
+    // The overnight pane must account for every visitor in one view. The
+    // current pane retains its gentle paging for very busy daytime windows.
+    var PAGE_SIZE = target === collage ? 12 : Infinity;
+    var totalItems = items.length;
     if (items.length > PAGE_SIZE) {
       var pages = Math.ceil(items.length / PAGE_SIZE);
       window.__collagePage = (window.__collagePage || 0) % pages;
@@ -524,7 +528,7 @@
       window.__collagePage = 0;
       clearTimeout(window.__collagePageTimer);
     }
-    collage.innerHTML = '';
+    target.innerHTML = '';
     // Drop the previous render's hit-test tiles up front so a click or hover on
     // the empty-nest state (or a collage that hasn't laid out yet) resolves to
     // nothing, not to a stale bird from the last populated render. The populated
@@ -535,7 +539,7 @@
       // No birds heard yet: show an empty nest where the collage would be, with
       // the status line beneath it. The frame (shoot.py) overrides the .empty
       // text for the e-ink panel; the nest illustration is shared by both.
-      collage.innerHTML = '<div class="empty-nest">' +
+      target.innerHTML = '<div class="empty-nest">' +
         '<img class="nest-img" src="nest.webp" alt="an empty nest" decoding="async">' +
         '<p class="empty">no birds heard in this window.</p></div>';
       // Bloom the nest in on the same cues as the collage (first load, window
@@ -543,7 +547,7 @@
       // class self-clears after the worst case so a throttled tab still ends
       // with the nest visible, mirroring the tile entrance's safety net.
       if (animate) {
-        var enest = collage.firstChild;
+        var enest = target.firstChild;
         enest.classList.add('entering');
         clearTimeout(collageEntranceT);
         collageEntranceT = setTimeout(function () { enest.classList.remove('entering'); }, 900);
@@ -551,8 +555,8 @@
       return;
     }
     // Silhouettes improve the packing, but must never gate a detection.
-    var W = collage.clientWidth, H = collage.clientHeight;
-    if (!W || !H) { setTimeout(function () { renderCollage(items, animate); }, 80); return; }
+    var W = target.clientWidth, H = target.clientHeight;
+    if (!W || !H) { setTimeout(function () { renderCollage(items, animate, target); }, 80); return; }
 
     // Tuning depends on bird count - same viewport, very different
     // pack densities for 6 vs 48 birds.
@@ -701,35 +705,37 @@
       image.alt = s.com || s.sci || 'Unidentified bird';
       image.addEventListener('error', function (ev) { var tile = ev.currentTarget.parentNode; tile.classList.add('image-missing'); if (ILLUSTRATION_REVISION && !tile.dataset.retried) { tile.dataset.retried = '1'; loadTables(); } });
       var caption = document.createElement('span');
-      caption.className = 'gtile-caption'; caption.textContent = s.com || s.sci || 'Unidentified bird';
+      caption.className = 'gtile-caption';
+      caption.textContent = (s.com || s.sci || 'Unidentified bird') +
+        (showDetectionTime && (s.last_seen_iso || s.detected_at) ? ' · ' + siteTime(s.last_seen_iso || s.detected_at) : '');
       btn.appendChild(image); btn.appendChild(caption);
       if (r.artworkPending) btn.classList.add('artwork-pending');
       r.el = btn;
-      collage.appendChild(btn);
+      target.appendChild(btn);
     });
     // Hover pill - created once per render so collage.innerHTML='' at
     // the top of this function doesn't strand a stale node. mousemove
     // populates its text from hit.data so the count is whatever the
     // current window's data says.
     var tip = document.createElement('div');
-    tip.id = 'collageTip';
+    tip.id = target === collage ? 'collageTip' : 'overnightCollageTip';
     tip.className = 'collage-tip';
     tip.setAttribute('aria-hidden', 'true');
-    collage.appendChild(tip);
-    if ((DATA.recent && DATA.recent.species || []).length > PAGE_SIZE) {
+    target.appendChild(tip);
+    if (totalItems > PAGE_SIZE) {
       var pageNote = document.createElement('span');
       pageNote.className = 'collage-page';
-      pageNote.textContent = 'Page ' + ((window.__collagePage || 0) + 1) + ' of ' + Math.ceil(DATA.recent.species.length / PAGE_SIZE);
-      collage.appendChild(pageNote);
+      pageNote.textContent = 'Page ' + ((window.__collagePage || 0) + 1) + ' of ' + Math.ceil(totalItems / PAGE_SIZE);
+      target.appendChild(pageNote);
     }
     // Stash the placed tiles so the alpha-mask hit-tester (below) can
     // resolve which silhouette the cursor is actually over.
-    collagePlaced = placed.filter(function (t) { return t.x > -1000; });
+    if (target === collage) collagePlaced = placed.filter(function (t) { return t.x > -1000; });
 
     // Bloom the birds in from the centre outward, but only when asked
     // (first load, window change, view switch) - never on the silent 30s
     // poll or a resize, which render without the animate flag.
-    if (animate) playCollageEntrance();
+    if (animate) playCollageEntrance(target);
   }
 
   // Staggered centre-out entrance: each tile fades + scales in, delayed by
@@ -737,10 +743,11 @@
   // middle out. Re-applied with a reflow reset so it can replay on demand
   // (e.g. switching back to the collage view).
   var collageEntranceT = null;
-  function playCollageEntrance() {
-    var tiles = [].slice.call(collage.querySelectorAll('.gtile'));
+  function playCollageEntrance(target) {
+    target = target || collage;
+    var tiles = [].slice.call(target.querySelectorAll('.gtile'));
     if (!tiles.length) return;
-    var cx = collage.clientWidth / 2, cy = collage.clientHeight / 2;
+    var cx = target.clientWidth / 2, cy = target.clientHeight / 2;
     var maxD = 1;
     var info = tiles.map(function (t) {
       var d = Math.hypot((t.offsetLeft + t.offsetWidth / 2) - cx,
@@ -753,7 +760,7 @@
       o.el.classList.remove('entering');
       o.el.style.animationDelay = ((o.d / maxD) * SPREAD).toFixed(0) + 'ms';
     });
-    void collage.offsetWidth;   // commit the reset so the animation replays
+    void target.offsetWidth;   // commit the reset so the animation replays
     info.forEach(function (o) { o.el.classList.add('entering'); });
     // Safety net: the keyframe starts the tiles hidden (backwards fill), so
     // if the animation never advances (a backgrounded/throttled tab where
@@ -900,6 +907,15 @@
     location.hash = '#sci=' + encodeURIComponent(hit.data.sci);
     go(2);
   });
+  // The dawn pane uses the same cards in a second canvas. Its tiles do not
+  // participate in the primary canvas's alpha hit-testing, but remain useful
+  // links into the atlas on touch and keyboard input.
+  document.getElementById('overnightCollage').addEventListener('click', function (ev) {
+    var tile = ev.target.closest && ev.target.closest('.gtile');
+    if (!tile || !tile.dataset.sci) return;
+    location.hash = '#sci=' + encodeURIComponent(tile.dataset.sci);
+    go(2);
+  });
 
   // Debug hook - call __layout({ slugs, weights, n }) from devtools to
   // re-render the collage with a custom item set. Lets us prove the
@@ -934,8 +950,107 @@
       collage.innerHTML = '<p class="empty">Loading detections…</p>';
       return;
     }
-    var items = (DATA.recent && DATA.recent.species) || [];
-    renderCollage(items, animate);
+    var scene = document.getElementById('sceneMain');
+    var currentRegion = document.getElementById('currentRegion');
+    var overnightRegion = document.getElementById('overnightRegion');
+    var currentCaption = document.getElementById('currentCaption');
+    var overnightCaption = document.getElementById('overnightCaption');
+    var overnightCollage = document.getElementById('overnightCollage');
+    var phase = scenePhase();
+    var currentItems = ((DATA.sceneRecent || DATA.recent) && (DATA.sceneRecent || DATA.recent).species) || [];
+    var overnightItems = (DATA.overnight && DATA.overnight.species) || [];
+
+    if (!scene || !currentRegion || !overnightRegion || !overnightCollage) {
+      renderCollage((DATA.recent && DATA.recent.species) || [], animate);
+      return;
+    }
+    scene.classList.toggle('is-dawn', phase === 'dawn' && overnightItems.length > 0);
+    if (phase === 'night' && overnightItems.length) {
+      // Overnight is the primary scene until sunrise; it deserves the whole
+      // bird canvas rather than being reduced to a footer or a list.
+      currentRegion.hidden = false;
+      overnightRegion.hidden = true;
+      currentCaption.hidden = false;
+      currentCaption.querySelector('span').textContent = 'Heard overnight';
+      currentCaption.querySelector('small').textContent = 'through sunrise';
+      renderCollage(overnightItems, animate);
+      return;
+    }
+    if (phase === 'dawn' && overnightItems.length) {
+      // The rolling-hour request can still contain a bird heard just before
+      // sunrise. Keep it on the left until it is heard again after dawn.
+      var sunrise = DATA.overnight.interval_end_iso || DATA.overnight.display_start_iso;
+      if (sunrise) {
+        var sunriseMs = new Date(sunrise).getTime();
+        if (!isNaN(sunriseMs)) currentItems = currentItems.filter(function (bird) {
+          var heardAt = new Date(bird.last_seen_iso || bird.detected_at || 0).getTime();
+          return !isNaN(heardAt) && heardAt >= sunriseMs;
+        });
+      }
+      currentRegion.hidden = false;
+      overnightRegion.hidden = false;
+      currentCaption.hidden = false;
+      currentCaption.querySelector('span').textContent = 'Morning birds';
+      currentCaption.querySelector('small').textContent = 'past hour';
+      if (overnightCaption) overnightCaption.textContent = displayEndsAt();
+      renderCollage(currentItems, animate);
+      renderCollage(overnightItems, animate, overnightCollage, true);
+      return;
+    }
+    currentRegion.hidden = false;
+    overnightRegion.hidden = true;
+    currentCaption.hidden = true;
+    renderCollage((DATA.recent && DATA.recent.species) || [], animate);
+  }
+
+  // The backend is the source of truth for site-local sunrise and the 09:00
+  // cut-off. Accept two field spellings while installations roll forward.
+  function scenePhase() {
+    // If the physical kiosk has disabled the overnight feature, keep the
+    // rolling bird scene full-width instead of leaving an empty dawn column.
+    if (document.documentElement.classList.contains('kiosk-overnight-off')) return 'day';
+    var night = DATA.overnight || {};
+    var phase = night.phase || night.display_phase;
+    var now = Date.now();
+    var start = new Date(night.interval_end_iso || night.display_start_iso || '').getTime();
+    var end = new Date(night.display_end_iso || '').getTime();
+    // Once the API has supplied its site-local boundaries, the screen can
+    // still honour them while a poll is temporarily unavailable.
+    if (!isNaN(end) && now >= end) return 'day';
+    if (phase === 'night' && !isNaN(start) && now >= start) return 'dawn';
+    if (phase === 'night' || phase === 'dawn' || phase === 'day') return phase;
+    // Legacy endpoint only made its payload visible during the morning
+    // handoff, so retain that useful behaviour until it gains `phase`.
+    return night.visible === true ? 'dawn' : 'day';
+  }
+
+  function displayEndsAt() {
+    var end = DATA.overnight && DATA.overnight.display_end_iso;
+    if (!end) return 'until 9am';
+    var date = new Date(end);
+    return isNaN(date.getTime()) ? 'until 9am' : 'until ' + siteTime(end);
+  }
+
+  function siteTime(iso) {
+    var date = new Date(iso || '');
+    if (isNaN(date.getTime())) return 'heard overnight';
+    var zone = displaySettings.timezone || displaySettings.time_zone || 'Australia/Brisbane';
+    try { return new Intl.DateTimeFormat(undefined, { timeZone: zone, hour: 'numeric', minute: '2-digit' }).format(date); }
+    catch (e) { return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+  }
+
+  var sceneClockTimer = null;
+  function scheduleSceneClock() {
+    clearTimeout(sceneClockTimer);
+    var night = DATA.overnight || {};
+    var boundaries = [night.interval_end_iso || night.display_start_iso, night.display_end_iso]
+      .map(function (value) { return new Date(value || '').getTime(); })
+      .filter(function (value) { return !isNaN(value) && value > Date.now(); })
+      .sort(function (a, b) { return a - b; });
+    if (!boundaries.length) return;
+    sceneClockTimer = setTimeout(function () {
+      renderCollageFromData(true); renderOvernight(); renderKoala(); scheduleSceneClock();
+    }, Math.max(50, boundaries[0] - Date.now() + 50));
   }
   var rTimer;
   window.addEventListener('resize', function () {
@@ -987,6 +1102,7 @@
     timeseries: null,   // ./avian/api/birdnet-api.php?action=timeseries (daily + hourly aggregates)
     firstseen: null,    // ./avian/api/birdnet-api.php?action=firstseen (newest lifelist additions)
     recent: null,       // ./avian/api/birdnet-api.php?action=recent&hours=N (refetched on picker change)
+    sceneRecent: null,  // rolling hour used by the dawn scene regardless of picker
     overnight: null,
     koala: null,
   };
@@ -1512,10 +1628,15 @@
     // lands later - we discard the stale response so the collage
     // never reverts to a different window.
     var forHours = currentHours;
-    return fetchJson('./avian/api/birdnet-api.php?action=recent&hours=' + forHours)
-      .then(function (j) {
+    return Promise.all([
+      fetchJson('./avian/api/birdnet-api.php?action=recent&hours=' + forHours),
+      fetchJson('./avian/api/birdnet-api.php?action=recent&hours=1'),
+      fetchJson('./avian/api/birdnet-api.php?action=overnight')
+    ])
+      .then(function (parts) {
         if (forHours !== currentHours) return; // window changed mid-flight
-        DATA.recent = j; renderWindowDependent(animate);
+        DATA.recent = parts[0]; DATA.sceneRecent = parts[1]; DATA.overnight = parts[2];
+        renderWindowDependent(animate); renderOvernight(); scheduleSceneClock();
       })
       .catch(function (e) { console.warn('recent fetch failed', e); setFreshness('Updates delayed — showing last successful view', true); });
   }
@@ -1530,6 +1651,7 @@
       fetchJson('./avian/api/birdnet-api.php?action=timeseries&days=30').catch(function () { return undefined; }),
       fetchJson('./avian/api/birdnet-api.php?action=firstseen&limit=10').catch(function () { return undefined; }),
       fetchJson('./avian/api/birdnet-api.php?action=recent&hours=' + forHours).catch(function () { return undefined; }),
+      fetchJson('./avian/api/birdnet-api.php?action=recent&hours=1').catch(function () { return undefined; }),
       fetchJson('./avian/api/birdnet-api.php?action=overnight').catch(function () { return undefined; }),
       fetchJson('./avian/api/koala.php').catch(function () { return undefined; }),
     ]).then(function (parts) {
@@ -1551,15 +1673,17 @@
       // Only accept the recent slice if the window hasn't changed
       // since this poll started - otherwise keep what's there.
       if (forHours === currentHours && parts[4]) DATA.recent = parts[4];
-      if (parts[5]) DATA.overnight = parts[5];
+      if (parts[5]) DATA.sceneRecent = parts[5];
+      if (parts[6]) DATA.overnight = parts[6];
       // Never retain a stale koala card after the morning cutoff when its
       // small status endpoint is unavailable for this refresh.
-      DATA.koala = parts[6] || null;
+      DATA.koala = parts[7] || null;
       recomputeDerived();
       renderTimeIndependent(animate);
       renderCollageFromData(animate);
       renderOvernight();
       renderKoala();
+      scheduleSceneClock();
       checkIllustrationRevision();
       lastSuccessAt = Date.now(); retryDelay = 1000;
       setFreshness('Updated ' + new Date(lastSuccessAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
@@ -1575,60 +1699,48 @@
   }
 
   function renderOvernight() {
-    var el = document.getElementById('overnightStrip'), night = DATA.overnight;
-    var view = document.getElementById('v0');
-    if (!el) return;
-    var enabled = currentHours === 1 && night && night.visible !== false && Array.isArray(night.species) && night.species.length;
-    el.hidden = !enabled;
-    if (!enabled) {
-      VIEW_TITLES[0] = 'Heard Recently';
-      if (view) view.classList.remove('has-overnight');
-      setTitleForView(currentView);
-      return;
-    }
-    var live = {}; ((DATA.recent && DATA.recent.species) || []).forEach(function (s) { live[s.sci] = true; });
-    var stripSpecies = night.species.filter(function (s) { return !live[s.sci]; });
-    // Keep the dawn chorus and earlier overnight visitors as two distinct
-    // groups, without annotating the live bird cards with a second period.
-    if (!stripSpecies.length) {
-      el.hidden = true;
-      VIEW_TITLES[0] = 'Dawn Chorus';
-      if (view) view.classList.remove('has-overnight');
-      setTitleForView(currentView);
-      return;
-    }
-    if (view) view.classList.add('has-overnight');
-    VIEW_TITLES[0] = 'Dawn Chorus';
+    var phase = scenePhase();
+    VIEW_TITLES[0] = phase === 'night' ? 'Overnight Visitors' : phase === 'dawn' ? 'Dawn Chorus' : 'Heard Recently';
     setTitleForView(currentView);
-    el.innerHTML = '';
-    var head = document.createElement('div'); head.className = 'overnight-heading';
-    var startHour = +displaySettings.night_start_hour;
-    var endHour = +displaySettings.night_end_hour;
-    var hourText = function (hour) {
-      var suffix = hour < 12 ? 'am' : 'pm'; var value = hour % 12 || 12;
-      return value + ' ' + suffix;
-    };
-    head.textContent = 'Earlier overnight · ' + hourText(startHour) + '–' + hourText(endHour); el.appendChild(head);
-    var list = document.createElement('div'); list.className = 'overnight-list';
-    stripSpecies.forEach(function (s) {
-      var item = document.createElement('div'); item.className = 'overnight-bird';
-      var name = document.createElement('strong'); name.textContent = s.com || s.sci || 'Unidentified bird';
-      var when = document.createElement('span'); when.textContent = s.last_seen_iso ? new Date(s.last_seen_iso).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) : 'heard overnight';
-      item.appendChild(name); item.appendChild(when); list.appendChild(item);
-    });
-    el.appendChild(list);
   }
 
   function renderKoala() {
     var el = document.getElementById('koalaPresence'), koala = DATA.koala;
+    var layout = document.getElementById('sceneLayout');
     if (!el) return;
-    if (!koala || koala.visible !== true || !koala.candidate) { el.hidden = true; return; }
-    var when = koala.candidate.detected_at ? new Date(koala.candidate.detected_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'overnight';
-    var rawScore = koala.candidate.confidence;
-    var score = rawScore === null || rawScore === '' || rawScore === undefined ? NaN : Number(rawScore);
-    var confidence = Number.isFinite(score) && score > 0 ? ' · ' + Math.round(score * 100) + '%' : '';
-    el.innerHTML = '<img src="./avian/assets/illustration-libraries/brisbane-wes-anderson/generated/phascolarctos-cinereus.png" alt="Koala illustration"><div><strong>Koala</strong><span>' + when + confidence + '</span></div>';
+    var phase = koala && koala.display_phase;
+    // At the 09:00 boundary, a cached dawn carry must disappear even when the
+    // status poll is down. A cached rolling-hour `recent` remains useful.
+    var staleDawnCarry = phase === 'dawn' && scenePhase() === 'day' && !koala.recent;
+    var visible = koala && koala.candidate && !staleDawnCarry && (koala.visible === true || (phase && phase !== 'inactive'));
+    if (!visible) {
+      el.hidden = true;
+      if (layout) layout.classList.remove('has-koala');
+      return;
+    }
+    var when = koala.candidate.detected_at ? siteTime(koala.candidate.detected_at) : 'overnight';
+    var confirmed = koala.candidate.status === 'confirmed' || koala.candidate.reviewed === true;
+    var label = confirmed ? 'Koala' : 'Possible koala';
+    var overnightCarry = phase === 'night' || (phase === 'dawn' && koala.overnight &&
+      koala.candidate.detected_at === koala.overnight.detected_at);
+    el.innerHTML = '';
+    var image = document.createElement('img');
+    image.src = './avian/assets/illustration-libraries/brisbane-wes-anderson/generated/phascolarctos-cinereus.png';
+    image.alt = 'Koala illustration';
+    var copy = document.createElement('div');
+    var heading = document.createElement('strong'); heading.textContent = label;
+    var detail = document.createElement('span'); detail.textContent = overnightCarry ? 'Heard overnight · ' + when : when;
+    copy.appendChild(heading); copy.appendChild(detail);
+    var recordingUrl = koala.candidate.recording_url || koala.candidate.audio_url;
+    if (!recordingUrl && koala.candidate.recording) recordingUrl = './avian/api/recording.php?file=' + encodeURIComponent(koala.candidate.recording);
+    if (recordingUrl) {
+      var listen = document.createElement('a');
+      listen.href = recordingUrl; listen.textContent = 'listen'; listen.className = 'koala-listen';
+      copy.appendChild(listen);
+    }
+    el.appendChild(image); el.appendChild(copy);
     el.hidden = false;
+    if (layout) layout.classList.add('has-koala');
   }
 
   function checkIllustrationRevision() {
@@ -2955,6 +3067,35 @@
   });
   document.getElementById('aboutLink').addEventListener('click', function () {
     location.hash = '#about';
+  });
+
+  function closeKoalaHistory() {
+    document.getElementById('koala-history-modal').setAttribute('aria-hidden', 'true');
+  }
+  document.getElementById('koalaHistory').addEventListener('click', function () {
+    var modal = document.getElementById('koala-history-modal');
+    var list = document.getElementById('koalaHistoryList');
+    modal.setAttribute('aria-hidden', 'false');
+    list.innerHTML = '<li>Loading detections…</li>';
+    fetchJson('./avian/api/koala.php?action=history&limit=25').then(function (data) {
+      var rows = data.history || data.candidates || [];
+      list.innerHTML = '';
+      if (!rows.length) { list.innerHTML = '<li>No koalas heard yet.</li>'; return; }
+      rows.forEach(function (row) {
+        var item = document.createElement('li');
+        var when = document.createElement('span'); when.textContent = siteTime(row.detected_at);
+        var link = document.createElement('a');
+        link.textContent = row.recording_url ? 'listen' : (row.status === 'confirmed' ? 'Koala' : 'Possible koala');
+        if (row.recording_url) { link.href = row.recording_url; }
+        item.appendChild(when); item.appendChild(link); list.appendChild(item);
+      });
+    }).catch(function () { list.innerHTML = '<li>History is temporarily unavailable.</li>'; });
+  });
+  document.getElementById('koala-history-modal').addEventListener('click', function (ev) {
+    if (ev.target.dataset && ev.target.dataset.close === '1') closeKoalaHistory();
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && document.getElementById('koala-history-modal').getAttribute('aria-hidden') === 'false') closeKoalaHistory();
   });
 
   // Shared decode context for spectrogram generation. Lives once for

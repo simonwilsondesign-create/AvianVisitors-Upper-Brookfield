@@ -10,7 +10,7 @@
 <!-- Apply the saved theme before first paint so dark mode doesn't flash
      light on load. The full switcher lives in Settings (writes bird:theme). -->
 <script>try{if(localStorage.getItem('bird:theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
-<link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./styles.css?v=r18">
 </head>
 <body class="av-local">
 <!-- Pill in the top-left slot, only visible on admin overlays
@@ -56,10 +56,21 @@
 
     <!-- ========== View 1 - Collage ========== -->
     <section class="view" id="v0" aria-label="Bird collage">
-      <div class="gcollage" id="collage"></div>
-      <aside class="koala-presence" id="koalaPresence" hidden aria-live="polite"></aside>
-      <section class="overnight-strip" id="overnightStrip" aria-live="polite" hidden></section>
+      <div class="scene-layout" id="sceneLayout">
+        <div class="scene-main" id="sceneMain">
+          <section class="bird-region overnight-region" id="overnightRegion" hidden aria-label="Heard overnight">
+            <header class="bird-region-head"><span>Heard overnight</span><small id="overnightCaption"></small></header>
+            <div class="gcollage" id="overnightCollage"></div>
+          </section>
+          <section class="bird-region current-region" id="currentRegion" aria-label="Birds heard recently">
+            <header class="bird-region-head current-region-head" id="currentCaption" hidden><span>Morning birds</span><small>past hour</small></header>
+            <div class="gcollage" id="collage"></div>
+          </section>
+        </div>
+        <aside class="koala-presence" id="koalaPresence" hidden aria-live="polite"></aside>
+      </div>
       <p class="display-freshness" id="displayFreshness" aria-live="polite">Loading detections…</p>
+      <button class="koala-history" id="koalaHistory" type="button">koala history</button>
     </section>
 
     <!-- ========== View 2 - Stats ========== -->
@@ -186,6 +197,16 @@
   </article>
 </div>
 
+<div id="koala-history-modal" aria-hidden="true" role="dialog" aria-labelledby="koalaHistoryTitle">
+  <div class="modal-backdrop" data-close="1"></div>
+  <article class="koala-history-card">
+    <button type="button" class="modal-close" data-close="1" aria-label="close">×</button>
+    <p class="about-eyebrow">your visitors</p>
+    <h2 id="koalaHistoryTitle">Koala history</h2>
+    <ol id="koalaHistoryList"><li>Loading detections…</li></ol>
+  </article>
+</div>
+
 <div id="about-modal" aria-hidden="true" role="dialog" aria-labelledby="aboutTitle">
   <div class="modal-backdrop" data-close="1"></div>
   <div class="about-card" role="document">
@@ -216,6 +237,6 @@
   </div>
 </section>
 
-<script src="./apt.js?v=r16"></script>
+<script src="./apt.js?v=r17"></script>
 </body>
 </html>

@@ -52,6 +52,28 @@ also require same-origin requests and a matching `X-Avian-CSRF` value from the
 `av_display_csrf` cookie returned on an authenticated GET. Do not set the trust
 flag merely because an Authorization header reaches PHP.
 
+## Night and morning scene
+
+The overnight scene accumulates detections from `night_start_hour` (18:00 by
+default). At local sunrise, those visitors move to the left and birds heard
+since sunrise within the past hour appear on the right. At `morning_end_hour`
+(09:00 by default), the overnight section clears. Stored detections restore the
+scene after a morning restart. Sunrise uses the site's BirdNET latitude and
+longitude; `night_end_hour` remains a legacy setting, not the dawn boundary.
+
+Koalas occupy reserved space beside the bird area. The listener runs throughout
+the day; recent candidates appear for an hour, and overnight candidates carry
+through the morning cutoff. Unreviewed candidates are labelled “Possible koala”.
+See [koala listener operations](../avian/docs/koala-listener.md) for saved audio
+and history. Existing detections whose audio has already rotated away cannot
+have their recordings recovered by this change.
+
+For a release, update the frontend HTML, JavaScript and CSS together with the
+API files and koala worker. Include `koala-recording.php`, grant the PHP service
+read access to preserved candidate WAVs, and reload the kiosk browser. Verify
+night, dawn, 09:00 and daytime-koala fixtures before checking the physical
+display and the next worker run on the Pi.
+
 ## Check and recover the display
 
 `GET /avian/api/display-config.php` returns `settings`, a small configuration

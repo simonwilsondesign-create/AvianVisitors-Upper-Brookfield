@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
-import math
 import os
 import shutil
 import sqlite3
@@ -17,58 +16,6 @@ from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Australia/Brisbane")
 KOALA_NAME = "Koala_CNN_LG_071223"
-
-
-def sun_utc(day: dt.date, latitude: float, longitude: float, sunrise: bool) -> dt.datetime:
-    # NOAA's public sunrise equation. Accuracy is comfortably within a minute
-    # for the scheduling boundary, without another runtime dependency.
-    n = day.timetuple().tm_yday
-    lng_hour = longitude / 15.0
-    t = n + ((6.0 - lng_hour) / 24.0 if sunrise else (18.0 - lng_hour) / 24.0)
-    m = (0.9856 * t) - 3.289
-    l = (m + 1.916 * math.sin(math.radians(m)) + 0.020 * math.sin(math.radians(2 * m)) + 282.634) % 360
-    ra = math.degrees(math.atan(0.91764 * math.tan(math.radians(l)))) % 360
-    ra += (math.floor(l / 90) * 90) - (math.floor(ra / 90) * 90)
-    ra /= 15.0
-    sin_dec = 0.39782 * math.sin(math.radians(l))
-    cos_dec = math.cos(math.asin(sin_dec))
-    cos_h = (math.cos(math.radians(90.833)) - sin_dec * math.sin(math.radians(latitude))) / (cos_dec * math.cos(math.radians(latitude)))
-    if not -1 <= cos_h <= 1:
-        raise ValueError("sun does not rise/set at this latitude today")
-    h = (360 - math.degrees(math.acos(cos_h)) if sunrise else math.degrees(math.acos(cos_h))) / 15.0
-    ut = (h + ra - (0.06571 * t) - 6.622 - lng_hour) % 24
-    result = dt.datetime.combine(day, dt.time(), dt.timezone.utc) + dt.timedelta(hours=ut)
-    # The equation returns a UTC clock time. For easterly longitudes a local
-    # sunrise can therefore land on the following local date unless its UTC
-    # date is corrected back to the requested local calendar day.
-    local_date = result.astimezone(TZ).date()
-    if local_date > day:
-        result -= dt.timedelta(days=1)
-    elif local_date < day:
-        result += dt.timedelta(days=1)
-    return result
-
-
-def listening_window(now: dt.datetime, latitude: float, longitude: float) -> tuple[dt.datetime, dt.datetime]:
-    today = now.date()
-    sunrise_today = sun_utc(today, latitude, longitude, True).astimezone(TZ)
-    if now < sunrise_today:
-        sunset = sun_utc(today - dt.timedelta(days=1), latitude, longitude, False).astimezone(TZ)
-        return sunset + dt.timedelta(hours=1), sunrise_today
-    sunset = sun_utc(today, latitude, longitude, False).astimezone(TZ)
-    sunrise_tomorrow = sun_utc(today + dt.timedelta(days=1), latitude, longitude, True).astimezone(TZ)
-    return sunset + dt.timedelta(hours=1), sunrise_tomorrow
-
-
-def config_values(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    if not path.is_file():
-        return values
-    for line in path.read_text(errors="replace").splitlines():
-        if "=" in line and not line.lstrip().startswith("#"):
-            key, value = line.split("=", 1)
-            values[key.strip()] = value.strip().strip('"').strip("'")
-    return values
 
 
 def recording_time(path: Path) -> dt.datetime:
@@ -104,6 +51,18 @@ def initialise(db: sqlite3.Connection) -> None:
     db.commit()
 
 
+def preserve_candidate_recording(recording: Path, destination: Path) -> None:
+    """Keep candidate audio after BirdNET rotates StreamData recordings."""
+    destination = Path(destination)
+    destination.mkdir(parents=True, exist_ok=True)
+    target = destination / recording.name
+    if target.is_file():
+        return
+    temporary = destination / f".{recording.name}.tmp"
+    shutil.copy2(recording, temporary)
+    os.replace(temporary, target)
+
+
 def process(recording: Path, args: argparse.Namespace, db: sqlite3.Connection) -> bool:
     if db.execute("SELECT 1 FROM processed WHERE recording = ?", (recording.name,)).fetchone():
         return False
@@ -118,6 +77,10 @@ def process(recording: Path, args: argparse.Namespace, db: sqlite3.Connection) -
             raise RuntimeError(f"AviaNZ failed for {recording.name}")
         data_file = Path(f"{input_file}.data")
         annotations = json.loads(data_file.read_text()) if data_file.exists() else []
+        if contains_koala(annotations):
+            # Keep the exact WAV AviaNZ just analysed before the temporary
+            # directory is removed or BirdNET rotates StreamData.
+            preserve_candidate_recording(input_file, args.candidate_recordings)
     db.execute("INSERT INTO processed (recording, processed_at) VALUES (?, ?)", (recording.name, dt.datetime.now(TZ).isoformat()))
     if contains_koala(annotations):
         detected = recording_time(recording).isoformat()
@@ -133,19 +96,18 @@ def main() -> int:
     parser.add_argument("--recordings", default="/home/pi/BirdSongs/StreamData")
     parser.add_argument("--state", default="/var/lib/avian-koala/state.sqlite")
     parser.add_argument("--work-dir", default="/var/lib/avian-koala")
+    parser.add_argument("--candidate-recordings", type=Path, default=Path("/var/lib/avian-koala/recordings"))
     parser.add_argument("--avianz", default="/opt/avian-koala/AviaNZ/AviaNZ.py")
     parser.add_argument("--python", default="/opt/avian-koala/venv/bin/python")
     parser.add_argument("--home", default="/home/pi")
     parser.add_argument("--filter", default="/home/pi/.avianz/Filters/Koala_CNN_LG_071223.txt")
     args = parser.parse_args()
     args.score = recogniser_score(Path(args.filter))
-    values = config_values(Path(args.config))
-    latitude, longitude = float(values.get("LATITUDE", "-27.4704")), float(values.get("LONGITUDE", "153.026"))
+    # Analyse completed BirdNET recordings throughout the day.  The display
+    # decides whether a candidate is recent or part of the dawn carry-over;
+    # keeping the worker continuous also ensures daytime recordings and older
+    # unprocessed files are added without deleting historical state.
     now = dt.datetime.now(TZ)
-    start, end = listening_window(now, latitude, longitude)
-    if not start <= now < end:
-        print(json.dumps({"active": False, "next_start": start.isoformat()}))
-        return 0
     recordings = sorted(Path(args.recordings).glob("*.wav"), key=lambda file: file.stat().st_mtime)
     db = sqlite3.connect(args.state)
     initialise(db)
@@ -160,7 +122,8 @@ def main() -> int:
         if recording.stat().st_size < 1_000_000:
             continue
         completed += int(process(recording, args, db))
-    print(json.dumps({"active": True, "window_end": end.isoformat(), "processed": completed}))
+    db.close()
+    print(json.dumps({"active": True, "processed": completed, "as_of": now.isoformat()}))
     return 0
 
 

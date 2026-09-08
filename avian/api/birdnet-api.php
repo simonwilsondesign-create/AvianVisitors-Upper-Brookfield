@@ -6,7 +6,7 @@
 //   stats       - totals (detections, unique species, today, last hour)
 //   lifelist    - every species with first_seen, last_seen, total_count
 //   recent      - &hours=N (default 24): species heard in the window
-//   overnight   - previous 18:00–06:00 site-local night, configurable
+//   overnight   - previous 18:00–Brisbane sunrise night; displayed until 09:00
 //   species     - &sci=<sci_name>: per-species detail page
 //   timeseries  - &days=N: daily detection counts per species
 //   firstseen   - every species' earliest detection
@@ -105,9 +105,13 @@ switch ($action) {
 
     case 'overnight': {
         $window = av_overnight_window($now, av_display_settings());
-        $rs = av_window_species($db, $window['start'], $window['end'], false);
+        // During the active night the interval ends at tomorrow's sunrise;
+        // never allow an anomalous future-dated row to appear early.
+        $queryEnd = $window['end'] > $now ? $now : $window['end'];
+        $rs = av_window_species($db, $window['start'], $queryEnd, false);
         echo json_encode([
             'species' => $rs, 'visible' => $window['visible'],
+            'phase' => $window['phase'],
             'interval_start_iso' => $window['start']->format(DATE_ATOM),
             'interval_end_iso' => $window['end']->format(DATE_ATOM),
             'display_start_iso' => $window['display_start']->format(DATE_ATOM),

@@ -8,16 +8,58 @@ function av_detection_now(): DateTimeImmutable {
     return new DateTimeImmutable('now', av_display_timezone());
 }
 
+/**
+ * Brisbane's civil timezone is the authority for display boundaries.  The
+ * PHP's bundled solar calculation keeps the sunrise boundary local without a
+ * network call or an additional Pi dependency.
+ */
+function av_brisbane_coordinates(): array {
+    $path = getenv('AV_BIRDNET_CONFIG_PATH') ?: '/etc/birdnet/birdnet.conf';
+    if (!is_readable($path)) $path = dirname(__DIR__, 2) . '/birdnet.conf';
+    $values = [];
+    if (is_readable($path)) {
+        foreach (file($path, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+            if (preg_match('/^\s*(LATITUDE|LONGITUDE)\s*=\s*([^#\s]+)/', $line, $match)) {
+                $values[$match[1]] = (float)trim($match[2], "\"'");
+            }
+        }
+    }
+    $latitude = $values['LATITUDE'] ?? -27.4705;
+    $longitude = $values['LONGITUDE'] ?? 153.0260;
+    return [$latitude, $longitude];
+}
+
+function av_brisbane_sunrise(DateTimeImmutable $day): DateTimeImmutable {
+    $tz = av_display_timezone();
+    $day = $day->setTimezone($tz);
+    [$latitude, $longitude] = av_brisbane_coordinates();
+    // Local noon ensures date_sun_info is asked for the requested local day.
+    $sun = date_sun_info($day->setTime(12, 0)->getTimestamp(), $latitude, $longitude);
+    if (!is_int($sun['sunrise'] ?? null)) throw new RuntimeException('Sunrise unavailable for site');
+    return (new DateTimeImmutable('@' . $sun['sunrise']))->setTimezone($tz);
+}
+
 function av_overnight_window(DateTimeImmutable $now, array $settings): array {
     $now = $now->setTimezone(av_display_timezone());
     $today = $now->setTime(0, 0);
-    $start = $today->modify('-1 day')->setTime($settings['night_start_hour'], 0);
-    $end = $today->setTime($settings['night_end_hour'], 0);
-    $displayEnd = $today->setTime($settings['morning_end_hour'], 0);
+    $nightStart = $today->setTime($settings['night_start_hour'], 0);
+    $sunrise = av_brisbane_sunrise($today);
+    if ($now >= $nightStart) {
+        $start = $nightStart;
+        $end = av_brisbane_sunrise($today->modify('+1 day'));
+        $displayEnd = $today->modify('+1 day')->setTime($settings['morning_end_hour'], 0);
+        $phase = 'night';
+    } else {
+        $start = $today->modify('-1 day')->setTime($settings['night_start_hour'], 0);
+        $end = $sunrise;
+        $displayEnd = $today->setTime($settings['morning_end_hour'], 0);
+        $phase = $now < $sunrise ? 'night' : ($now < $displayEnd ? 'dawn' : 'day');
+    }
     return [
         'start' => $start, 'end' => $end,
         'display_start' => $end, 'display_end' => $displayEnd,
-        'visible' => $settings['overnight_enabled'] && $now >= $end && $now < $displayEnd,
+        'phase' => $phase,
+        'visible' => $settings['overnight_enabled'] && in_array($phase, ['night', 'dawn'], true),
     ];
 }
 
