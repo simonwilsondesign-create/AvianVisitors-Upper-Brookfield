@@ -703,9 +703,6 @@
       var caption = document.createElement('span');
       caption.className = 'gtile-caption'; caption.textContent = s.com || s.sci || 'Unidentified bird';
       btn.appendChild(image); btn.appendChild(caption);
-      if (currentHours === 1 && DATA.overnight && DATA.overnight.visible !== false && Array.isArray(DATA.overnight.species) && DATA.overnight.species.some(function (n) { return n.sci === s.sci; })) {
-        caption.textContent += ' · last night';
-      }
       if (r.artworkPending) btn.classList.add('artwork-pending');
       r.el = btn;
       collage.appendChild(btn);
@@ -1555,7 +1552,9 @@
       // since this poll started - otherwise keep what's there.
       if (forHours === currentHours && parts[4]) DATA.recent = parts[4];
       if (parts[5]) DATA.overnight = parts[5];
-      if (parts[6]) DATA.koala = parts[6];
+      // Never retain a stale koala card after the morning cutoff when its
+      // small status endpoint is unavailable for this refresh.
+      DATA.koala = parts[6] || null;
       recomputeDerived();
       renderTimeIndependent(animate);
       renderCollageFromData(animate);
@@ -1581,13 +1580,26 @@
     if (!el) return;
     var enabled = currentHours === 1 && night && night.visible !== false && Array.isArray(night.species) && night.species.length;
     el.hidden = !enabled;
-    if (!enabled) { if (view) view.classList.remove('has-overnight'); return; }
+    if (!enabled) {
+      VIEW_TITLES[0] = 'Heard Recently';
+      if (view) view.classList.remove('has-overnight');
+      setTitleForView(currentView);
+      return;
+    }
     var live = {}; ((DATA.recent && DATA.recent.species) || []).forEach(function (s) { live[s.sci] = true; });
     var stripSpecies = night.species.filter(function (s) { return !live[s.sci]; });
-    // If every overnight visitor is currently live, the annotations on their
-    // main cards carry the information without duplicating the birds below.
-    if (!stripSpecies.length) { el.hidden = true; if (view) view.classList.remove('has-overnight'); return; }
+    // Keep the dawn chorus and earlier overnight visitors as two distinct
+    // groups, without annotating the live bird cards with a second period.
+    if (!stripSpecies.length) {
+      el.hidden = true;
+      VIEW_TITLES[0] = 'Dawn Chorus';
+      if (view) view.classList.remove('has-overnight');
+      setTitleForView(currentView);
+      return;
+    }
     if (view) view.classList.add('has-overnight');
+    VIEW_TITLES[0] = 'Dawn Chorus';
+    setTitleForView(currentView);
     el.innerHTML = '';
     var head = document.createElement('div'); head.className = 'overnight-heading';
     var startHour = +displaySettings.night_start_hour;
@@ -1596,7 +1608,7 @@
       var suffix = hour < 12 ? 'am' : 'pm'; var value = hour % 12 || 12;
       return value + ' ' + suffix;
     };
-    head.textContent = 'Heard last night · ' + hourText(startHour) + '–' + hourText(endHour); el.appendChild(head);
+    head.textContent = 'Earlier overnight · ' + hourText(startHour) + '–' + hourText(endHour); el.appendChild(head);
     var list = document.createElement('div'); list.className = 'overnight-list';
     stripSpecies.forEach(function (s) {
       var item = document.createElement('div'); item.className = 'overnight-bird';
@@ -1614,8 +1626,8 @@
     var when = koala.candidate.detected_at ? new Date(koala.candidate.detected_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'overnight';
     var rawScore = koala.candidate.confidence;
     var score = rawScore === null || rawScore === '' || rawScore === undefined ? NaN : Number(rawScore);
-    var accuracy = Number.isFinite(score) && score > 0 ? ' · ' + Math.round(score * 100) + '% recogniser accuracy' : '';
-    el.innerHTML = '<img src="./avian/assets/illustration-libraries/brisbane-wes-anderson/generated/phascolarctos-cinereus.png" alt="Koala illustration"><div><strong>Koala heard</strong><span>' + when + accuracy + ' · review candidate</span></div>';
+    var confidence = Number.isFinite(score) && score > 0 ? ' · ' + Math.round(score * 100) + '%' : '';
+    el.innerHTML = '<img src="./avian/assets/illustration-libraries/brisbane-wes-anderson/generated/phascolarctos-cinereus.png" alt="Koala illustration"><div><strong>Koala</strong><span>' + when + confidence + '</span></div>';
     el.hidden = false;
   }
 

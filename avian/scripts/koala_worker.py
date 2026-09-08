@@ -37,7 +37,16 @@ def sun_utc(day: dt.date, latitude: float, longitude: float, sunrise: bool) -> d
         raise ValueError("sun does not rise/set at this latitude today")
     h = (360 - math.degrees(math.acos(cos_h)) if sunrise else math.degrees(math.acos(cos_h))) / 15.0
     ut = (h + ra - (0.06571 * t) - 6.622 - lng_hour) % 24
-    return dt.datetime.combine(day, dt.time(), dt.timezone.utc) + dt.timedelta(hours=ut)
+    result = dt.datetime.combine(day, dt.time(), dt.timezone.utc) + dt.timedelta(hours=ut)
+    # The equation returns a UTC clock time. For easterly longitudes a local
+    # sunrise can therefore land on the following local date unless its UTC
+    # date is corrected back to the requested local calendar day.
+    local_date = result.astimezone(TZ).date()
+    if local_date > day:
+        result -= dt.timedelta(days=1)
+    elif local_date < day:
+        result += dt.timedelta(days=1)
+    return result
 
 
 def listening_window(now: dt.datetime, latitude: float, longitude: float) -> tuple[dt.datetime, dt.datetime]:
