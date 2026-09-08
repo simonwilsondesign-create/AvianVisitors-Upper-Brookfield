@@ -140,6 +140,9 @@ def main() -> int:
     recordings = sorted(Path(args.recordings).glob("*.wav"), key=lambda file: file.stat().st_mtime)
     db = sqlite3.connect(args.state)
     initialise(db)
+    if args.score is not None:
+        db.execute("UPDATE detections SET confidence = ? WHERE confidence IS NULL", (args.score,))
+        db.commit()
     completed = 0
     for recording in recordings:
         # BirdNET keeps updating a recording's mtime until it removes it, so

@@ -1612,8 +1612,9 @@
     if (!el) return;
     if (!koala || koala.visible !== true || !koala.candidate) { el.hidden = true; return; }
     var when = koala.candidate.detected_at ? new Date(koala.candidate.detected_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'overnight';
-    var score = Number(koala.candidate.confidence);
-    var accuracy = Number.isFinite(score) ? ' · ' + Math.round(score * 100) + '% recogniser accuracy' : '';
+    var rawScore = koala.candidate.confidence;
+    var score = rawScore === null || rawScore === '' || rawScore === undefined ? NaN : Number(rawScore);
+    var accuracy = Number.isFinite(score) && score > 0 ? ' · ' + Math.round(score * 100) + '% recogniser accuracy' : '';
     el.innerHTML = '<img src="./avian/assets/illustration-libraries/brisbane-wes-anderson/generated/phascolarctos-cinereus.png" alt="Koala illustration"><div><strong>Koala heard</strong><span>' + when + accuracy + ' · review candidate</span></div>';
     el.hidden = false;
   }
