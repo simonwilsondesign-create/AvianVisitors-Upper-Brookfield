@@ -944,12 +944,41 @@
   // Collage renders whatever is in DATA.recent.species. When the picker
   // changes, refreshRecent() refetches and re-renders. Empty state shows
   // a "no detections in this window" message.
+  // A live count rises with every recognised call. Repacking the entire
+  // collage for that bookkeeping change makes a kiosk look as if it is
+  // flickering, especially through a busy dawn chorus. Keep the displayed
+  // flock stable between polls; redraw when a bird enters/leaves the visible
+  // set, or when the night/dawn/day arrangement changes.
+  var lastSceneVisualSignature = null;
+  function sceneVisualSignature() {
+    var phase = scenePhase();
+    var rolling = ((DATA.sceneRecent || DATA.recent) && (DATA.sceneRecent || DATA.recent).species) || [];
+    var recent = (DATA.recent && DATA.recent.species) || [];
+    var overnight = (DATA.overnight && DATA.overnight.species) || [];
+    var current = phase === 'day' ? recent : rolling;
+    if (phase === 'dawn') {
+      var sunrise = DATA.overnight && (DATA.overnight.interval_end_iso || DATA.overnight.display_start_iso);
+      var sunriseMs = new Date(sunrise || '').getTime();
+      if (!isNaN(sunriseMs)) {
+        current = current.filter(function (bird) {
+          var heardAt = new Date(bird.last_seen_iso || bird.detected_at || 0).getTime();
+          return !isNaN(heardAt) && heardAt >= sunriseMs;
+        });
+      }
+    }
+    function names(items) {
+      return items.map(function (bird) { return bird.sci || ''; }).sort().join(',');
+    }
+    return [phase, names(current), phase === 'dawn' || phase === 'night' ? names(overnight) : ''].join('|');
+  }
+
   function renderCollageFromData(animate) {
     if (!DATA.recent) {
       collagePlaced = [];
       collage.innerHTML = '<p class="empty">Loading detections…</p>';
       return;
     }
+    lastSceneVisualSignature = sceneVisualSignature();
     var scene = document.getElementById('sceneMain');
     var currentRegion = document.getElementById('currentRegion');
     var overnightRegion = document.getElementById('overnightRegion');
@@ -1680,7 +1709,12 @@
       DATA.koala = parts[7] || null;
       recomputeDerived();
       renderTimeIndependent(animate);
-      renderCollageFromData(animate);
+      // Silent polls update counts, charts and lists, but leave the actual
+      // flock alone unless the visible species or display phase changed.
+      // Explicit interactions and the first load still render immediately.
+      if (animate || sceneVisualSignature() !== lastSceneVisualSignature) {
+        renderCollageFromData(animate);
+      }
       renderOvernight();
       renderKoala();
       scheduleSceneClock();
