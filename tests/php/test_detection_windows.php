@@ -10,12 +10,14 @@ function check(bool $condition, string $message): void {
 $timezone = new DateTimeZone('Australia/Brisbane');
 $dawn = new DateTimeImmutable('2026-09-07 08:00:00', $timezone);
 $window = av_overnight_window($dawn, av_display_defaults());
-$sunrise = $window['end'];
+$sunrise = av_brisbane_sunrise($dawn);
+$dawnStart = $window['end'];
 
 check($sunrise->format('Y-m-d') === '2026-09-07', 'sunrise stays on the requested Brisbane date');
 check((int)$sunrise->format('G') >= 4 && (int)$sunrise->format('G') <= 7, 'sunrise is a local morning boundary');
+check($dawnStart == $sunrise->modify('-2 hours'), 'overnight birds end two hours before sunrise');
 check($window['visible'] === true, 'overnight birds remain visible during the dawn display');
-check($window['phase'] === 'dawn', 'sunrise to 09:00 is the dawn split-scene phase');
+check($window['phase'] === 'dawn', 'the pre-sunrise dawn period to 09:00 is the split-scene phase');
 check($window['start']->format('Y-m-d H:i:s') === '2026-09-06 18:00:00', 'overnight starts on the previous evening');
 
 $night = av_overnight_window(new DateTimeImmutable('2026-09-07 20:00:00', $timezone), av_display_defaults());
@@ -35,16 +37,16 @@ $add = static function (DateTimeImmutable $at, string $sci, string $com, string 
     $insert->execute();
 };
 
-// A real overnight bird, a first-light bird exactly at sunrise, and a bird
+// A real overnight bird, a first-light bird exactly at the dawn cutoff, and a bird
 // from the rolling one-hour dawn chorus are deliberately distinct.
 $add($window['start'], 'Ninox boobook', 'Southern Boobook', 'night-start.wav');
-$add($sunrise->modify('-1 second'), 'Tyto alba', 'Barn Owl', 'last-night.wav');
-$add($sunrise, 'Pachycephala pectoralis', 'Golden Whistler', 'sunrise.wav');
+$add($dawnStart->modify('-1 second'), 'Tyto alba', 'Barn Owl', 'last-night.wav');
+$add($dawnStart, 'Pachycephala pectoralis', 'Golden Whistler', 'dawn.wav');
 $add($dawn->modify('-30 minutes'), 'Acanthiza pusilla', 'Brown Thornbill', 'dawn.wav');
 
-$overnight = av_window_species($db, $window['start'], $sunrise, false);
-check(count($overnight) === 2, 'overnight query retains birds through the final second before sunrise');
-check(!in_array('Pachycephala pectoralis', array_column($overnight, 'sci'), true), 'a sunrise detection is not duplicated in the overnight group');
+$overnight = av_window_species($db, $window['start'], $dawnStart, false);
+check(count($overnight) === 2, 'overnight query retains birds through the final second before the dawn cutoff');
+check(!in_array('Pachycephala pectoralis', array_column($overnight, 'sci'), true), 'a dawn-cutoff detection is not duplicated in the overnight group');
 
 $morning = av_window_species($db, $dawn->modify('-1 hour'), $dawn);
 check(count($morning) === 1 && $morning[0]['sci'] === 'Acanthiza pusilla', 'dawn chorus uses only its rolling one-hour window');
@@ -55,7 +57,7 @@ check($cutoff['phase'] === 'day', '09:00 returns to the normal daytime scene');
 
 // A fresh morning request reconstructs the same bounded slices from the
 // database, rather than depending on state held by an earlier render.
-$restartOvernight = av_window_species($db, $window['start'], $sunrise, false);
+$restartOvernight = av_window_species($db, $window['start'], $dawnStart, false);
 $restartMorning = av_window_species($db, $dawn->modify('-1 hour'), $dawn);
 check(array_column($restartOvernight, 'sci') === array_column($overnight, 'sci'), 'morning restart restores overnight detections');
 check(array_column($restartMorning, 'sci') === array_column($morning, 'sci'), 'morning restart restores rolling-hour detections');

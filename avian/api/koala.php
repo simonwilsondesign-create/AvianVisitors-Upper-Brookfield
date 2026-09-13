@@ -29,7 +29,9 @@ function av_koala_candidate(SQLite3 $db, DateTimeImmutable $start, DateTimeImmut
 
 $now = av_detection_now();
 $settings = av_display_settings();
-$overnightWindow = av_overnight_window($now, $settings);
+// Koalas remain eligible throughout the real night, including the dawn
+// chorus; the bird display alone excludes its two-hour pre-sunrise period.
+$overnightWindow = av_overnight_window($now, $settings, 0);
 $recentStart = $now->modify('-1 hour');
 $overnightQueryEnd = $overnightWindow['end'] > $now ? $now : $overnightWindow['end'];
 $path = getenv('AV_KOALA_STATE_PATH') ?: '/var/lib/avian-koala/state.sqlite';

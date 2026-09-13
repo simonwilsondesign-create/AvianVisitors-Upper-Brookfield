@@ -55,8 +55,9 @@ flag merely because an Authorization header reaches PHP.
 ## Night and morning scene
 
 The overnight scene accumulates detections from `night_start_hour` (18:00 by
-default). At local sunrise, those visitors move to the left and birds heard
-since sunrise within the past hour appear on the right. At `morning_end_hour`
+default) until two hours before local sunrise. That pre-sunrise period is the
+dawn chorus: overnight visitors remain on the left and birds heard since the
+dawn cutoff within the past hour appear on the right. At `morning_end_hour`
 (09:00 by default), the overnight section clears. Stored detections restore the
 scene after a morning restart. Sunrise uses the site's BirdNET latitude and
 longitude; `night_end_hour` remains a legacy setting, not the dawn boundary.

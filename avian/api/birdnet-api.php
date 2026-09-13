@@ -105,7 +105,7 @@ switch ($action) {
 
     case 'overnight': {
         $window = av_overnight_window($now, av_display_settings());
-        // During the active night the interval ends at tomorrow's sunrise;
+        // During the active night the interval ends two hours before tomorrow's sunrise;
         // never allow an anomalous future-dated row to appear early.
         $queryEnd = $window['end'] > $now ? $now : $window['end'];
         $rs = av_window_species($db, $window['start'], $queryEnd, false);

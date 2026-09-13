@@ -1001,19 +1001,20 @@
       overnightRegion.hidden = true;
       currentCaption.hidden = false;
       currentCaption.querySelector('span').textContent = 'Heard overnight';
-      currentCaption.querySelector('small').textContent = 'through sunrise';
+      currentCaption.querySelector('small').textContent = 'until dawn';
       renderCollage(overnightItems, animate);
       return;
     }
     if (phase === 'dawn' && overnightItems.length) {
       // The rolling-hour request can still contain a bird heard just before
-      // sunrise. Keep it on the left until it is heard again after dawn.
-      var sunrise = DATA.overnight.interval_end_iso || DATA.overnight.display_start_iso;
-      if (sunrise) {
-        var sunriseMs = new Date(sunrise).getTime();
-        if (!isNaN(sunriseMs)) currentItems = currentItems.filter(function (bird) {
+      // the dawn cutoff. Keep it on the left until it is heard again after
+      // dawn starts.
+      var dawnStart = DATA.overnight.interval_end_iso || DATA.overnight.display_start_iso;
+      if (dawnStart) {
+        var dawnStartMs = new Date(dawnStart).getTime();
+        if (!isNaN(dawnStartMs)) currentItems = currentItems.filter(function (bird) {
           var heardAt = new Date(bird.last_seen_iso || bird.detected_at || 0).getTime();
-          return !isNaN(heardAt) && heardAt >= sunriseMs;
+          return !isNaN(heardAt) && heardAt >= dawnStartMs;
         });
       }
       currentRegion.hidden = false;

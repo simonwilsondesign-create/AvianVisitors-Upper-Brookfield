@@ -39,21 +39,27 @@ function av_brisbane_sunrise(DateTimeImmutable $day): DateTimeImmutable {
     return (new DateTimeImmutable('@' . $sun['sunrise']))->setTimezone($tz);
 }
 
-function av_overnight_window(DateTimeImmutable $now, array $settings): array {
+/**
+ * The bird display treats the two hours before sunrise as dawn chorus, not
+ * overnight. Callers such as the all-day koala listener can request the full
+ * night by passing zero for $preDawnHours.
+ */
+function av_overnight_window(DateTimeImmutable $now, array $settings, int $preDawnHours = 2): array {
     $now = $now->setTimezone(av_display_timezone());
     $today = $now->setTime(0, 0);
     $nightStart = $today->setTime($settings['night_start_hour'], 0);
     $sunrise = av_brisbane_sunrise($today);
+    $preDawnHours = max(0, $preDawnHours);
     if ($now >= $nightStart) {
         $start = $nightStart;
-        $end = av_brisbane_sunrise($today->modify('+1 day'));
+        $end = av_brisbane_sunrise($today->modify('+1 day'))->modify("-$preDawnHours hours");
         $displayEnd = $today->modify('+1 day')->setTime($settings['morning_end_hour'], 0);
         $phase = 'night';
     } else {
         $start = $today->modify('-1 day')->setTime($settings['night_start_hour'], 0);
-        $end = $sunrise;
+        $end = $sunrise->modify("-$preDawnHours hours");
         $displayEnd = $today->setTime($settings['morning_end_hour'], 0);
-        $phase = $now < $sunrise ? 'night' : ($now < $displayEnd ? 'dawn' : 'day');
+        $phase = $now < $end ? 'night' : ($now < $displayEnd ? 'dawn' : 'day');
     }
     return [
         'start' => $start, 'end' => $end,
