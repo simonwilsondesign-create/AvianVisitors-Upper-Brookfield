@@ -1,7 +1,7 @@
 # Native frog survey collector
 
 The first frog-monitoring stage is collection only. BirdNET continues to own
-the microphone. Once each minute, the collector reads completed 15-second WAV
+the microphone. Every two seconds, the collector reads completed 15-second WAV
 files from `/home/pi/BirdSongs/StreamData`, keeps recordings made from 17:00
 through 08:59 Brisbane time, and stores mono 48 kHz FLAC copies under
 `/var/lib/avian-frog/recordings/YYYY-MM-DD/`.

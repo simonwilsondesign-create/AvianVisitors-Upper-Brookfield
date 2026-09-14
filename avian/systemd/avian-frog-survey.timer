@@ -3,7 +3,7 @@ Description=Archive BirdNET recordings for native frog review
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=1min
+OnUnitActiveSec=2sec
 Persistent=true
 Unit=avian-frog-survey.service
 
