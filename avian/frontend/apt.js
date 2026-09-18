@@ -1754,7 +1754,7 @@
       return;
     }
     var when = koala.candidate.detected_at ? siteTime(koala.candidate.detected_at) : 'overnight';
-    var label = 'Koala';
+    var label = koala.candidate.status === 'confirmed' ? 'Koala' : 'Koala call detected';
     var overnightCarry = phase === 'night' || (phase === 'dawn' && koala.overnight &&
       koala.candidate.detected_at === koala.overnight.detected_at);
     el.innerHTML = '';

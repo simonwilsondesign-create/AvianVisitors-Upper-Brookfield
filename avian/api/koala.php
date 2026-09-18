@@ -14,7 +14,9 @@ function av_koala_enrich_candidate(array $candidate): array {
 }
 
 function av_koala_candidate(SQLite3 $db, DateTimeImmutable $start, DateTimeImmutable $end): ?array {
-    $query = $db->prepare("SELECT detected_at, confidence, recording, status FROM detections WHERE detected_at >= :start AND detected_at < :end AND status = 'confirmed' ORDER BY detected_at DESC LIMIT 1");
+    // The worker has already excluded filter metadata. A retained event is a
+    // genuine recogniser result and should be visible without a manual gate.
+    $query = $db->prepare("SELECT detected_at, confidence, recording, status FROM detections WHERE detected_at >= :start AND detected_at < :end AND status IN ('unreviewed', 'confirmed') ORDER BY detected_at DESC LIMIT 1");
     if (!$query) return null;
     $query->bindValue(':start', $start->format(DATE_ATOM), SQLITE3_TEXT);
     $query->bindValue(':end', $end->format(DATE_ATOM), SQLITE3_TEXT);
