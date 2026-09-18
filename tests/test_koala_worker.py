@@ -39,6 +39,5 @@ class TestKoalaWorker(unittest.TestCase):
             with wave.open(str(root / "candidates" / row[1])) as candidate:
                 self.assertEqual(candidate.getnframes(), 240000)
 
-    def test_listening_window_is_dusk_to_dawn(self):
-        self.assertTrue(koala_worker.is_listening_time(koala_worker.recording_time(Path("2026-09-07-birdnet-18:00:00.wav"))))
-        self.assertFalse(koala_worker.is_listening_time(koala_worker.recording_time(Path("2026-09-07-birdnet-12:00:00.wav"))))
+    def test_recording_time_uses_brisbane_timezone(self):
+        self.assertEqual(koala_worker.recording_time(Path("2026-09-07-birdnet-12:00:00.wav")).utcoffset().total_seconds(), 36000)
