@@ -1754,8 +1754,7 @@
       return;
     }
     var when = koala.candidate.detected_at ? siteTime(koala.candidate.detected_at) : 'overnight';
-    var confirmed = koala.candidate.status === 'confirmed' || koala.candidate.reviewed === true;
-    var label = confirmed ? 'Koala' : 'Possible koala';
+    var label = 'Koala';
     var overnightCarry = phase === 'night' || (phase === 'dawn' && koala.overnight &&
       koala.candidate.detected_at === koala.overnight.detected_at);
     el.innerHTML = '';
@@ -1766,18 +1765,6 @@
     var heading = document.createElement('strong'); heading.textContent = label;
     var detail = document.createElement('span'); detail.textContent = overnightCarry ? 'Heard overnight · ' + when : when;
     copy.appendChild(heading); copy.appendChild(detail);
-    var score = Number(koala.candidate.confidence);
-    if (isFinite(score) && score >= 0 && score <= 1) {
-      var confidence = document.createElement('span');
-      // The installed AviaNZ filter publishes a true-positive rate, not a
-      // probability for this individual recording. Keep that distinction
-      // visible on the only species-specific percentage shown on the kiosk.
-      confidence.textContent = koala.candidate.confidence_kind === 'filter_tpr'
-        ? 'recogniser rate ' + Math.round(score * 100) + '%'
-        : 'match confidence ' + Math.round(score * 100) + '%';
-      confidence.className = 'koala-confidence';
-      copy.appendChild(confidence);
-    }
     var recordingUrl = koala.candidate.recording_url || koala.candidate.audio_url;
     if (!recordingUrl && koala.candidate.recording) recordingUrl = './avian/api/recording.php?file=' + encodeURIComponent(koala.candidate.recording);
     if (recordingUrl) {

@@ -6,8 +6,6 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 function av_koala_enrich_candidate(array $candidate): array {
-    // The published TPR is filter context, never event-level certainty.
-    $candidate['confidence_kind'] = 'filter_tpr';
     $root = getenv('AV_KOALA_RECORDINGS_PATH') ?: '/var/lib/avian-koala/recordings';
     if (is_file($root . '/' . $candidate['recording'])) {
         $candidate['recording_url'] = '/avian/api/koala-recording.php?recording=' . rawurlencode((string)$candidate['recording']);
@@ -16,7 +14,7 @@ function av_koala_enrich_candidate(array $candidate): array {
 }
 
 function av_koala_candidate(SQLite3 $db, DateTimeImmutable $start, DateTimeImmutable $end): ?array {
-    $query = $db->prepare("SELECT detected_at, confidence, recording, status FROM detections WHERE detected_at >= :start AND detected_at < :end AND status != 'rejected' ORDER BY detected_at DESC LIMIT 1");
+    $query = $db->prepare("SELECT detected_at, confidence, recording, status FROM detections WHERE detected_at >= :start AND detected_at < :end AND status = 'confirmed' ORDER BY detected_at DESC LIMIT 1");
     if (!$query) return null;
     $query->bindValue(':start', $start->format(DATE_ATOM), SQLITE3_TEXT);
     $query->bindValue(':end', $end->format(DATE_ATOM), SQLITE3_TEXT);
@@ -45,7 +43,7 @@ if (is_file($path) && class_exists('SQLite3')) {
         $overnight = av_koala_candidate($db, $overnightWindow['start'], $overnightQueryEnd);
         if (($_GET['action'] ?? '') === 'history') {
             $limit = max(1, min(100, (int)($_GET['limit'] ?? 25)));
-            $query = $db->prepare("SELECT detected_at, confidence, recording, status FROM detections WHERE status != 'rejected' ORDER BY detected_at DESC LIMIT :limit");
+            $query = $db->prepare("SELECT detected_at, confidence, recording, status FROM detections WHERE status IN ('unreviewed', 'confirmed') ORDER BY detected_at DESC LIMIT :limit");
             $query->bindValue(':limit', $limit, SQLITE3_INTEGER);
             $result = $query->execute();
             while ($result && ($row = $result->fetchArray(SQLITE3_ASSOC))) $history[] = av_koala_enrich_candidate($row);

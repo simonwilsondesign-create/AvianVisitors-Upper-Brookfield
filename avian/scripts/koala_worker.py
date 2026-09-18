@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the official koala recogniser over finished BirdNET recordings."""
+"""Create dusk-to-dawn koala review candidates from BirdNET audio."""
 from __future__ import annotations
 
 import argparse
@@ -11,6 +11,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import wave
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -19,80 +20,113 @@ KOALA_NAME = "Koala_CNN_LG_071223"
 
 
 def recording_time(path: Path) -> dt.datetime:
-    stamp = path.name.removesuffix(".wav").removeprefix("birdnet-")
-    if "-birdnet-" in path.name:
-        stamp = path.name.split("-birdnet-", 1)[0] + " " + path.name.split("-birdnet-", 1)[1].removesuffix(".wav")
+    stamp = path.name.removesuffix(".wav")
+    if "-birdnet-" in stamp:
+        stamp = stamp.split("-birdnet-", 1)[0] + " " + stamp.split("-birdnet-", 1)[1]
     return dt.datetime.strptime(stamp, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ)
 
 
-def contains_koala(value: object) -> bool:
-    if isinstance(value, str):
-        return "koala" in value.lower()
+def is_listening_time(when: dt.datetime) -> bool:
+    """Conservative Brisbane dusk-to-dawn survey window."""
+    return when.hour >= 17 or when.hour < 9
+
+
+def annotation_has_koala_event(value: object) -> bool:
+    """Accept only an annotation with a koala label and a time interval.
+
+    The AviaNZ filter name is present in every result file, including files
+    without calls. A bare species/filter string must never create a candidate.
+    """
     if isinstance(value, dict):
-        return any(contains_koala(key) or contains_koala(item) for key, item in value.items())
+        label = " ".join(str(v) for k, v in value.items()
+                         if k.lower() in {"label", "species", "calltype", "name", "type"})
+        values = [v for k, v in value.items()
+                  if k.lower() in {"start", "end", "starttime", "endtime", "offset", "duration"}
+                  and isinstance(v, (int, float))]
+        return ("koala" in label.lower() and len(values) >= 2) or any(annotation_has_koala_event(v) for v in value.values())
     if isinstance(value, list):
-        return any(contains_koala(item) for item in value)
+        if sum(isinstance(v, (int, float)) for v in value) >= 2 and any(isinstance(v, str) and "koala" in v.lower() for v in value):
+            return True
+        return any(annotation_has_koala_event(v) for v in value)
     return False
-
-
-def recogniser_score(filter_file: Path) -> float | None:
-    """Return the supplied filter's true-positive rate as a display score."""
-    try:
-        data = json.loads(filter_file.read_text())
-        tpr = data["Filters"][0]["TPR, FPR"][0]
-        return max(0.0, min(1.0, float(tpr) / 100.0))
-    except (OSError, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
-        return None
 
 
 def initialise(db: sqlite3.Connection) -> None:
     db.execute("CREATE TABLE IF NOT EXISTS processed (recording TEXT PRIMARY KEY, processed_at TEXT NOT NULL)")
     db.execute("CREATE TABLE IF NOT EXISTS detections (detected_at TEXT NOT NULL, confidence REAL, recording TEXT NOT NULL UNIQUE, status TEXT NOT NULL)")
+    db.execute("CREATE TABLE IF NOT EXISTS worker_meta (name TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    # Previous records came from the metadata bug. Keep them for audit, but
+    # they cannot be shown or mixed with newly generated review candidates.
+    migrated = db.execute("SELECT 1 FROM worker_meta WHERE name = 'metadata_fix_v1'").fetchone()
+    if not migrated:
+        db.execute("UPDATE detections SET status = 'legacy-unverified' WHERE status = 'unreviewed'")
+        db.execute("INSERT INTO worker_meta (name, value) VALUES ('metadata_fix_v1', 'done')")
     db.commit()
 
 
+def wave_duration(path: Path) -> float | None:
+    try:
+        with wave.open(str(path), "rb") as source:
+            return source.getnframes() / source.getframerate()
+    except (wave.Error, OSError, ZeroDivisionError):
+        return None
+
+
+def combine_pair(first: Path, second: Path, output: Path) -> bool:
+    try:
+        with wave.open(str(first), "rb") as left, wave.open(str(second), "rb") as right:
+            if left.getparams()[:3] != right.getparams()[:3]:
+                return False
+            with wave.open(str(output), "wb") as merged:
+                merged.setparams(left.getparams())
+                merged.writeframes(left.readframes(left.getnframes()))
+                merged.writeframes(right.readframes(right.getnframes()))
+        return True
+    except (wave.Error, OSError):
+        return False
+
+
 def preserve_candidate_recording(recording: Path, destination: Path) -> None:
-    """Keep candidate audio after BirdNET rotates StreamData recordings."""
-    destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
     target = destination / recording.name
-    if target.is_file():
-        return
-    temporary = destination / f".{recording.name}.tmp"
-    shutil.copy2(recording, temporary)
-    os.replace(temporary, target)
+    if not target.is_file():
+        temporary = destination / f".{recording.name}.tmp"
+        shutil.copy2(recording, temporary)
+        os.replace(temporary, target)
 
 
-def process(recording: Path, args: argparse.Namespace, db: sqlite3.Connection) -> bool:
-    if db.execute("SELECT 1 FROM processed WHERE recording = ?", (recording.name,)).fetchone():
+def process(first: Path, second: Path, args: argparse.Namespace, db: sqlite3.Connection) -> bool:
+    key = f"{first.name}|{second.name}"
+    if db.execute("SELECT 1 FROM processed WHERE recording = ?", (key,)).fetchone():
         return False
+    output_name = first.name.removesuffix(".wav") + "-koala-window.wav"
     with tempfile.TemporaryDirectory(dir=args.work_dir, prefix="run-") as temporary:
         job = Path(temporary)
-        input_file = job / recording.name
-        shutil.copy2(recording, input_file)
+        input_file = job / output_name
+        if not combine_pair(first, second, input_file):
+            return False
         command = [args.python, args.avianz, "-c", "-b", "-d", str(job), "-r", KOALA_NAME]
-        result = subprocess.run(command, input="y\n", text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env={**os.environ, "HOME": args.home}, timeout=120)
+        result = subprocess.run(command, input="y\n", text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                env={**os.environ, "HOME": args.home}, timeout=120)
         if result.returncode:
             print(result.stdout[-4000:], file=sys.stderr)
-            raise RuntimeError(f"AviaNZ failed for {recording.name}")
+            raise RuntimeError(f"AviaNZ failed for {key}")
         data_file = Path(f"{input_file}.data")
         annotations = json.loads(data_file.read_text()) if data_file.exists() else []
-        if contains_koala(annotations):
-            # Keep the exact WAV AviaNZ just analysed before the temporary
-            # directory is removed or BirdNET rotates StreamData.
+        detected = annotation_has_koala_event(annotations)
+        if detected:
             preserve_candidate_recording(input_file, args.candidate_recordings)
-    db.execute("INSERT INTO processed (recording, processed_at) VALUES (?, ?)", (recording.name, dt.datetime.now(TZ).isoformat()))
-    if contains_koala(annotations):
-        detected = recording_time(recording).isoformat()
-        db.execute("INSERT OR IGNORE INTO detections (detected_at, confidence, recording, status) VALUES (?, ?, ?, ?)", (detected, args.score, recording.name, "unreviewed"))
-        print(f"koala candidate: {recording.name}")
+    db.execute("INSERT INTO processed (recording, processed_at) VALUES (?, ?)", (key, dt.datetime.now(TZ).isoformat()))
+    if detected:
+        db.execute("INSERT OR IGNORE INTO detections (detected_at, confidence, recording, status) VALUES (?, NULL, ?, 'unreviewed')",
+                   (recording_time(first).isoformat(), output_name))
+        print(f"koala review candidate: {output_name}")
     db.commit()
     return True
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="/etc/birdnet/birdnet.conf")
     parser.add_argument("--recordings", default="/home/pi/BirdSongs/StreamData")
     parser.add_argument("--state", default="/var/lib/avian-koala/state.sqlite")
     parser.add_argument("--work-dir", default="/var/lib/avian-koala")
@@ -100,28 +134,20 @@ def main() -> int:
     parser.add_argument("--avianz", default="/opt/avian-koala/AviaNZ/AviaNZ.py")
     parser.add_argument("--python", default="/opt/avian-koala/venv/bin/python")
     parser.add_argument("--home", default="/home/pi")
-    parser.add_argument("--filter", default="/home/pi/.avianz/Filters/Koala_CNN_LG_071223.txt")
     args = parser.parse_args()
-    args.score = recogniser_score(Path(args.filter))
-    # Analyse completed BirdNET recordings throughout the day.  The display
-    # decides whether a candidate is recent or part of the dawn carry-over;
-    # keeping the worker continuous also ensures daytime recordings and older
-    # unprocessed files are added without deleting historical state.
     now = dt.datetime.now(TZ)
-    recordings = sorted(Path(args.recordings).glob("*.wav"), key=lambda file: file.stat().st_mtime)
     db = sqlite3.connect(args.state)
     initialise(db)
-    if args.score is not None:
-        db.execute("UPDATE detections SET confidence = ? WHERE confidence IS NULL", (args.score,))
-        db.commit()
+    recordings = sorted(Path(args.recordings).glob("*.wav"), key=recording_time)
     completed = 0
-    for recording in recordings:
-        # BirdNET keeps updating a recording's mtime until it removes it, so
-        # file age is not a useful completion signal. A one-megabyte WAV is a
-        # stable, several-second snapshot that AviaNZ can analyse in isolation.
-        if recording.stat().st_size < 1_000_000:
+    for first, second in zip(recordings[::2], recordings[1::2]):
+        when = recording_time(first)
+        if not is_listening_time(when) or (recording_time(second) - when).total_seconds() != 15:
             continue
-        completed += int(process(recording, args, db))
+        first_seconds, second_seconds = wave_duration(first), wave_duration(second)
+        if first_seconds is None or second_seconds is None or first_seconds < 14.9 or second_seconds < 14.9:
+            continue
+        completed += int(process(first, second, args, db))
     db.close()
     print(json.dumps({"active": True, "processed": completed, "as_of": now.isoformat()}))
     return 0
