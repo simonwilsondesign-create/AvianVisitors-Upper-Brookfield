@@ -119,6 +119,15 @@ def process(first: Path, second: Path, args: argparse.Namespace, db: sqlite3.Con
         data_file = Path(f"{input_file}.data")
         annotations = json.loads(data_file.read_text()) if data_file.exists() else []
         detected = annotation_has_koala_event(annotations)
+        # Keep one small, privacy-local diagnostic record. This makes a known
+        # playback test inspectable without retaining every non-candidate WAV.
+        diagnostic = Path(args.work_dir) / "last-avianz-result.json"
+        diagnostic.write_text(json.dumps({
+            "recording": output_name,
+            "analysed_at": dt.datetime.now(TZ).isoformat(),
+            "event_detected": detected,
+            "annotations": annotations,
+        }))
         if detected:
             preserve_candidate_recording(input_file, args.candidate_recordings)
     db.execute("INSERT INTO processed (recording, processed_at) VALUES (?, ?)", (key, dt.datetime.now(TZ).isoformat()))
