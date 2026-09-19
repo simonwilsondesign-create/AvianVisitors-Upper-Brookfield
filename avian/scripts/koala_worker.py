@@ -40,10 +40,22 @@ def annotation_has_koala_event(value: object) -> bool:
                   and isinstance(v, (int, float))]
         return ("koala" in label.lower() and len(values) >= 2) or any(annotation_has_koala_event(v) for v in value.values())
     if isinstance(value, list):
-        if sum(isinstance(v, (int, float)) for v in value) >= 2 and any(isinstance(v, str) and "koala" in v.lower() for v in value):
+        if sum(isinstance(v, (int, float)) for v in value) >= 2 and annotation_has_koala_label(value):
             return True
         return any(annotation_has_koala_event(v) for v in value)
     return False
+
+
+def annotation_has_koala_label(value: object) -> bool:
+    """Find a koala species/call label within one AviaNZ annotation."""
+    if isinstance(value, dict):
+        if any("koala" in str(v).lower() for k, v in value.items()
+               if k.lower() in {"label", "species", "calltype", "name", "type"}):
+            return True
+        return any(annotation_has_koala_label(v) for v in value.values())
+    if isinstance(value, list):
+        return any(annotation_has_koala_label(v) for v in value)
+    return isinstance(value, str) and "koala" in value.lower()
 
 
 def initialise(db: sqlite3.Connection) -> None:

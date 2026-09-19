@@ -21,6 +21,7 @@ class TestKoalaWorker(unittest.TestCase):
         self.assertFalse(koala_worker.annotation_has_koala_event({"species": "Koala"}))
         self.assertFalse(koala_worker.annotation_has_koala_event(["Koala_CNN_LG_071223"]))
         self.assertTrue(koala_worker.annotation_has_koala_event({"label": "Koala", "start": 2.1, "end": 4.6}))
+        self.assertTrue(koala_worker.annotation_has_koala_event([1.0, 16.0, 80, 3970, [{"species": "Koala", "calltype": "Male_Koala"}]]))
 
     def test_event_creates_a_30_second_unreviewed_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:
